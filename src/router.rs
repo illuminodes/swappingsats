@@ -49,7 +49,7 @@ pub fn bottom_navigation() -> HtmlResult {
                   <button class={
                     classes!(base_class.clone(), if current_route == Some(AppRoute::History) { "text-blue-600" } else { "text-gray-500" })
                   }>
-                      <lucide_yew::History class="w-5 h-5 mb-1" />
+                      // <lucide_yew::History class="w-5 h-5 mb-1" />
                       <span class="text-xs">{"History"}</span>
                   </button>
               </yew_router::components::Link<crate::router::AppRoute>>
@@ -58,7 +58,7 @@ pub fn bottom_navigation() -> HtmlResult {
                   <button class={
                     classes!(base_class.clone(), if current_route == Some(AppRoute::Home) { "text-blue-600" } else { "text-gray-500" })
                   }>
-                      <lucide_yew::Wallet class="w-5 h-5 mb-1" />
+                      // <lucide_yew::Wallet class="w-5 h-5 mb-1" />
                       <span class="text-xs">{"Wallets"}</span>
                   </button>
               </yew_router::components::Link<crate::router::AppRoute>>
@@ -67,7 +67,7 @@ pub fn bottom_navigation() -> HtmlResult {
                   <button class={
                     classes!(base_class.clone(), if current_route == Some(AppRoute::Keys) { "text-blue-600" } else { "text-gray-500" })
                   }>
-                      <lucide_yew::Settings class="w-5 h-5 mb-1" />
+                      // <lucide_yew::Settings class="w-5 h-5 mb-1" />
                       <span class="text-xs">{"Settings"}</span>
                   </button>
               </yew_router::components::Link<crate::router::AppRoute>>

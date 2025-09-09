@@ -48,7 +48,7 @@ pub fn swap_coins_screen() -> HtmlResult {
                 html! {
                     <Suspense fallback={html! {
                         <div class="w-full items-center justify-center flex p-4">
-                            <crate::components::Loader class="size-8 animate-spin text-gray-500" />
+                            // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
                         </div>
                     }}>
                         <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
@@ -159,7 +159,7 @@ pub fn swap_notification(props: &SwapNotificationProps) -> HtmlResult {
             <a href={format!("https://blockstream.info/liquidtestnet/tx/{}", props.req_id)}
                target="_blank"
                class="text-blue-500 hover:underline mt-2 block">
-               <crate::components::ExternalLink class="size-4 inline mr-1" />
+               // <crate::components::ExternalLink class="size-4 inline mr-1" />
                {"View Transaction"}
             </a>
         </div>

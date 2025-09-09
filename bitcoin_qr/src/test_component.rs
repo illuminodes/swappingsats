@@ -27,16 +27,12 @@ pub fn bitcoin_qr_test() -> Html {
                     <p class="text-sm text-gray-600 text-center">{"Scan this QR code with a Lightning wallet to test"}</p>
 
                     <BitcoinQrCode
-                        id={"lightning-qr".to_string()}
-                        width={"200".to_string()}
-                        height={"200".to_string()}
-                        lightning={sample_invoice.to_string()}
-                        type_={Some(QrType::Svg)}
-                        corners_square_type={Some(QrCornersSquareType::ExtraRounded)}
-                        corners_square_color={Some("#B40A2D".to_string())}
-                        corners_dot_color={Some("#ECC81D".to_string())}
-                        dots_type={Some(QrDotsType::ClassyRounded)}
-                        dots_color={Some("#377E3F".to_string())}
+                        id={"bitcoin-qr".to_string()}
+                        address={sample_bitcoin_address.to_string()}
+                        dots_shape={fast_qr::convert::Shape::Circle}
+                        dots_color={"#FF9900".to_string()}
+                        corners_square_color={"#FF9900".to_string()}
+                        corners_dot_color={"#FF9900".to_string()}
                     />
 
                     <button
@@ -52,16 +48,11 @@ pub fn bitcoin_qr_test() -> Html {
 
                     <BitcoinQrCode
                         id={"bitcoin-qr".to_string()}
-                        width={"200".to_string()}
-                        height={"200".to_string()}
-                        bitcoin={sample_bitcoin_address.to_string()}
-                        type_={Some(QrType::Svg)}
-                        dots_type={Some(QrDotsType::Rounded)}
-                        dots_color={Some("#FF9900".to_string())}
-                        corners_square_type={Some(QrCornersSquareType::Dot)}
-                        corners_square_color={Some("#FF9900".to_string())}
-                        corners_dot_type={Some(QrCornersDotType::Dot)}
-                        corners_dot_color={Some("#FF9900".to_string())}
+                        address={sample_bitcoin_address.to_string()}
+                        dots_shape={fast_qr::convert::Shape::Circle}
+                        dots_color={"#FF9900".to_string()}
+                        corners_square_color={"#FF9900".to_string()}
+                        corners_dot_color={"#FF9900".to_string()}
                     />
 
                     <button

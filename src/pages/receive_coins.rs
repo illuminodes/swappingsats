@@ -106,21 +106,18 @@ fn receive_liquid_coins() -> HtmlResult {
 
               // QR Code
               <div class="bg-white p-6 rounded-lg mb-6 flex justify-center">
-                  <div class="w-48 h-48 bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center">
-                      <BitcoinQrCode
-                          id={"wallet-receive".to_string()}
-                          bitcoin={address.to_string()}
-                          width={240.to_string()}
-                          height={240.to_string()}
-                          type_={Some(yew_bitcoin_qr::QrType::Svg)}
-                          corners_square_type={Some(yew_bitcoin_qr::QrCornersSquareType::ExtraRounded)}
-                          image={Some("https://liquid.net/_next/static/media/logo.28b5ba97.svg".to_string())}
-                          corners_square_color={Some("#03A6A6".to_string())}
-                          corners_dot_color={Some("#04BFAD".to_string())}
-                          dots_type={Some(yew_bitcoin_qr::QrDotsType::ClassyRounded)}
-                          dots_color={Some("#100940".to_string())}
-                          poll_interval={Some(100_000)}
-                      />
+                  <div class="size-fit bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center">
+                    <BitcoinQrCode
+                        id={"bitcoin-qr".to_string()}
+                        address={address.to_string()}
+                        size={400}
+                        image_url={Some("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSuEvQLIjpwyNdMRB6Tt1vJzaEjFHiX_Xixng&s".to_string())}
+                        dots_shape={yew_bitcoin_qr::Shape::Circle}
+                        dots_color={"#FF9900".to_string()}
+                        corners_square_color={"#FF9900".to_string()}
+                        corners_dot_color={"#FF9900".to_string()}
+                    />
+
                   </div>
               </div>
 

@@ -9,6 +9,7 @@
 
 mod bindings;
 pub use bindings::*;
+pub use fast_qr::convert::Shape;
 
 #[cfg(test)]
 mod test_component;

@@ -17,7 +17,7 @@ pub fn send_coins_screen() -> HtmlResult {
                        })
                    }
                    class="p-2 border border-gray-200 shadow-lg mr-4 rounded-xl">
-                   <lucide_yew::ArrowLeft class="size-5" />
+                   // <lucide_yew::ArrowLeft class="size-5" />
                </button>
             }
         } else {
@@ -25,7 +25,7 @@ pub fn send_coins_screen() -> HtmlResult {
                <yew_router::components::Link<crate::router::AppRoute>
                    to={crate::router::AppRoute::Home}>
                    <button class="p-2 border border-gray-200 shadow-lg mr-4 rounded-xl">
-                       <lucide_yew::ArrowLeft class="size-5" />
+                      //  <lucide_yew::ArrowLeft class="size-5" />
                    </button>
                </yew_router::components::Link<crate::router::AppRoute>>
             }
@@ -182,10 +182,10 @@ fn send_coin_form(props: &AssetTilesProps) -> Html {
                     required=true />
                 {match *address {
                     Some(true) => html!(
-                        <lucide_yew::Check class={address_checked} />
+                        // <lucide_yew::Check class={address_checked} />
                     ),
                     Some(false) => html!(
-                        <lucide_yew::X class={address_checked} />
+                        // <lucide_yew::X class={address_checked} />
                     ),
                     None => html!(),
                 }}
