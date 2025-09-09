@@ -1,0 +1,12 @@
+[package]
+name = "yew-bitcoin-qr"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+yew = { version = "0.21.0" }
+
+[dev-dependencies]
+web-sys = { version = "0.3.60", features = ["Navigator", "Clipboard"] }
+
+

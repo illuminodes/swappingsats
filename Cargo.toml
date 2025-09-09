@@ -1,0 +1,35 @@
+[package]
+name = "swappingsats"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+idb = { version = "0.6.4" }
+gloo = { version = "0.11.0", features = ["timers"] }
+wasm-bindgen = "0.2.100"
+web-sys = "0.3.77"
+yew = { version = "0.21.0", features = ["csr"] }
+yew-router = "0.18.0"
+yew-bitcoin-qr = { path = "./bitcoin_qr" }
+
+
+elements = "0.25.1"
+elements-miniscript = "0.4.0"
+lwk_common = { version = "0.11.0", default-features = false }
+lwk_wollet = { version = "0.11.0" , default-features = false, features = ["age", "esplora", "rmpv", "rmp-serde", "amp0"] }
+lwk_signer = { version = "0.11.0" , default-features = false }
+ring = { version = "0.17", features = ["wasm32_unknown_unknown_js"] }
+
+
+tokio = { version = "1.45.1", features = ["sync"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+serde-wasm-bindgen = "0.6.5"
+
+nostr-minions = { version = "0.1.20" }
+shady-minions = { path = "./shady-minions" }
+
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+wasm-bindgen-futures = "0.4.50"
+thiserror = "2.0.16"
+
