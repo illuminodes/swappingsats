@@ -56,7 +56,7 @@ pub fn send_coins_screen() -> HtmlResult {
 
 #[function_component(SendCoinForm)]
 fn send_coin_form(props: &AssetTilesProps) -> Html {
-    let wallet_ctx = use_context::<crate::wallet_provider::NostradeWalletStore>()
+    let wallet_ctx = use_context::<crate::NostradeWalletStore>()
         .expect("No wallet context found");
 
     let (asset_img, asset_name) = match *props.asset_handle {

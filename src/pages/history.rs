@@ -53,7 +53,7 @@ pub fn swap_coins_screen() -> HtmlResult {
 
 #[function_component(TxHistory)]
 pub fn tx_history(_props: &WalletHistoryScreenProps) -> HtmlResult {
-    let txs = crate::wallet_provider::use_wallet_transactions()?;
+    let txs = crate::use_wallet_transactions()?;
     // let tx_handle = props.transaction.clone();
     Ok(html! {
             <div>

@@ -83,7 +83,7 @@ fn main_options() -> HtmlResult {
 
 #[function_component(AssetList)]
 fn asset_list() -> HtmlResult {
-    let balance = crate::wallet_provider::use_wallet_balance()?;
+    let balance = crate::use_wallet_balance()?;
     web_sys::console::log_1(&format!("Balance: {:?}", balance).into());
     let liquid_balance = balance
         .iter()

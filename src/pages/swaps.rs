@@ -8,7 +8,7 @@ pub struct SwapCoinsScreenProps {
 #[function_component(SwapTesting)]
 pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
     let utxo_to_swap = props.utxo_to_swap.clone();
-    let wallet_ctx = use_context::<crate::wallet_provider::NostradeWalletStore>()
+    let wallet_ctx = use_context::<crate::NostradeWalletStore>()
         .expect("No wallet context found");
     let nostr_key = nostr_minions::use_nostr_key();
     let relay_ctx = nostr_minions::use_nostr_relay_pool();
@@ -40,14 +40,18 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
                     "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49"
                 }
                 _ => "Unknown Asset",
-            }.parse::<elements::AssetId>().expect("Failed to parse asset id");
+            }
+            .parse::<elements::AssetId>()
+            .expect("Failed to parse asset id");
             yew::platform::spawn_local(async move {
+                let Some(persistor) = wallet.persistor() else {
+                    return;
+                };
                 let address = wallet.address().await.expect("Failed to get address");
                 let proposal = wallet
                     .liquidex_proposal(utxo.outpoint, &address, swap_amount, asset_id)
                     .await
                     .expect("Failed to create proposal");
-                web_sys::console::log_1(&format!("{proposal:?}").into());
                 let mut proposal_note = nostr_minions::nostro2::NostrNote {
                     content: serde_json::to_string(&proposal).unwrap(),
                     kind: 32121,
@@ -56,13 +60,19 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
                 proposal_note
                     .tags
                     .add_parameter_tag(proposal.needed_tx().unwrap().to_string().as_str());
-
-                nostr_key.sign_note(&mut proposal_note);
-                web_sys::console::log_1(&format!("{proposal_note:?}").into());
+                nostr_key
+                    .sign_note(&mut proposal_note)
+                    .expect("Failed to sign note");
+                let persisted_proposal =
+                    crate::persister::PersistedProposal::new(proposal_note.clone())
+                        .expect("Failed to create persisted proposal");
+                if let Err(e) = persistor.push_proposal(persisted_proposal).await {
+                    web_sys::console::error_1(&format!("Failed to persist proposal: {e}").into());
+                }
                 // TODO: SEND TO NOSTR
                 // TODO: SAVE PROPOSAL TO LOCAL STORAGE
                 let _ = relay.send(proposal_note);
-            })
+            });
         })
     };
 
@@ -139,7 +149,7 @@ pub fn swap_coins_screen() -> HtmlResult {
 
 #[function_component(UtxoToSwap)]
 pub fn utxo_to_swap(props: &SwapCoinsScreenProps) -> HtmlResult {
-    let wallet_ctx = use_context::<crate::wallet_provider::NostradeWalletStore>()
+    let wallet_ctx = use_context::<crate::NostradeWalletStore>()
         .expect("No wallet context found");
     let waiting_for_swap = use_state(|| None::<String>);
     let nostr_key = nostr_minions::use_nostr_key();
@@ -245,7 +255,7 @@ pub fn swap_notification(props: &SwapNotificationProps) -> HtmlResult {
 
 #[function_component(SwappableUtxos)]
 pub fn swappable_utxos(props: &SwapCoinsScreenProps) -> HtmlResult {
-    let utxos = crate::wallet_provider::use_wallet_utxos()?;
+    let utxos = crate::use_wallet_utxos()?;
     let to_swap = props.utxo_to_swap.setter();
     Ok(html! {
             <div>

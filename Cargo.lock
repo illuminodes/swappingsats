@@ -1989,9 +1989,9 @@ dependencies = [
 
 [[package]]
 name = "nostr-minions"
-version = "0.1.21"
+version = "0.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a3f0b708e5fb0794a133eca924852d0c02fe34847615293f63790724b6ec0ea"
+checksum = "b0ba292925d16cb1e724b885dcf306feca8c1dbabe810a7cf65a7616194ad507"
 dependencies = [
  "idb",
  "nostro2",

@@ -3,13 +3,14 @@
 
 pub mod components;
 
-use wallet_provider::NostradeWalletStore;
 use yew::prelude::*;
 mod pages;
 pub mod persister;
+pub use persister::*;
 // mod quote_provider;
 mod router;
-mod wallet_provider;
+mod contexts;
+pub use contexts::*;
 pub use pages::*;
 
 fn main() {
@@ -42,11 +43,13 @@ fn app() -> Html {
             }}>
                 <nostr_minions::NostrAppProvider {relays}>
                 <LoginCheck>
-                    <wallet_provider::WalletProvider>
+                    <WalletProvider>
+                    <OrderBookProvider>
                         <router::MainPages />
                         <WalletLoad />
                         <WalletSync />
-                    </wallet_provider::WalletProvider>
+                    </OrderBookProvider>
+                    </WalletProvider>
                 </LoginCheck>
                 </nostr_minions::NostrAppProvider>
             </Suspense>
@@ -80,15 +83,15 @@ fn wallet_load() -> Html {
             let sync_handle = sync_clone.clone();
             yew::platform::spawn_local(async move {
                 // loop {
-                sync_handle.set(true);
-                // // web_sys::console::log_1(&"Syncing wallet...".into());
-                if ctx_clone.simple_sync().await.is_ok() {
-                    ctx_clone.dispatch(wallet_provider::NostradeWalletAction::Synced);
-                    web_sys::console::log_1(&"Wallet synced successfully".into());
-                } else {
-                      web_sys::console::error_1(&"Failed to sync wallet".into());
-                }
-                sync_handle.set(false);
+                // sync_handle.set(true);
+                // // // web_sys::console::log_1(&"Syncing wallet...".into());
+                // if ctx_clone.simple_sync().await.is_ok() {
+                //     ctx_clone.dispatch(NostradeWalletAction::Synced);
+                //     web_sys::console::log_1(&"Wallet synced successfully".into());
+                // } else {
+                //       web_sys::console::error_1(&"Failed to sync wallet".into());
+                // }
+                // sync_handle.set(false);
                 //     gloo::timers::future::sleep(std::time::Duration::from_secs(180)).await;
                 // }
             });
@@ -111,7 +114,7 @@ fn wallet_load() -> Html {
                 yew::platform::spawn_local(async move {
                     sync_handle.set(true);
                     if ctx.full_sync().await.is_ok() {
-                        ctx.dispatch(wallet_provider::NostradeWalletAction::Synced);
+                        ctx.dispatch(NostradeWalletAction::Synced);
                         web_sys::console::log_1(&"Wallet synced successfully".into());
                     } else {
                         web_sys::console::error_1(&"Failed to sync wallet".into());
@@ -129,10 +132,10 @@ fn wallet_load() -> Html {
 fn wallet_load() -> HtmlResult {
     let ctx = use_context::<NostradeWalletStore>().expect("No wallet context found");
     let clone_ctx = ctx.clone();
-    let _synced: yew::suspense::UseFutureHandle<Result<_, wallet_provider::NostradeWalletError>> =
+    let _synced: yew::suspense::UseFutureHandle<Result<_, NostradeWalletError>> =
         yew::suspense::use_future_with((), |_| async move {
             clone_ctx.load().await?;
-            ctx.dispatch(wallet_provider::NostradeWalletAction::Loaded);
+            ctx.dispatch(NostradeWalletAction::Loaded);
             web_sys::console::log_1(&"Wallet loaded successfully".into());
             Ok(())
         })?;

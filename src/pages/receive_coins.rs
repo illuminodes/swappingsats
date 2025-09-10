@@ -57,7 +57,7 @@ pub fn receive_coins_screen() -> Html {
 #[function_component(ReceiveLiquidCoins)]
 fn receive_liquid_coins() -> HtmlResult {
     let copied = use_state(|| false);
-    let Some(address) = crate::wallet_provider::use_wallet_address() else {
+    let Some(address) = crate::use_wallet_address() else {
         return Ok(html! {
             <div class="p-4">
                 <p class="text-red-500">{"Failed to load wallet address."}</p>

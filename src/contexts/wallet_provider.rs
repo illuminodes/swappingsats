@@ -38,6 +38,9 @@ pub struct NostradeWallet {
     persistor: Option<crate::persister::IdbPersister>,
 }
 impl NostradeWallet {
+    pub const fn persistor(&self) -> Option<&crate::persister::IdbPersister> {
+        self.persistor.as_ref()
+    }
     pub const fn loaded(&self) -> bool {
         self.loaded
     }
@@ -50,7 +53,7 @@ impl NostradeWallet {
         let Some(persistor) = &self.persistor else {
             return Ok(());
         };
-        let updates = persistor.get_all().await?;
+        let updates = persistor.get_all_updates().await?;
 
         for update in updates {
             if let Err(e) = wollet.apply_update_no_persist(update.clone()) {
@@ -62,7 +65,6 @@ impl NostradeWallet {
         Ok(())
     }
     pub async fn simple_sync(&self) -> Result<(), NostradeWalletError> {
-        let last_unused = self.address().await?;
         let Some(persistor) = &self.persistor else {
             web_sys::console::error_1(&"No persistor found".into());
             return Err(NostradeWalletError::NoPersister);
@@ -81,7 +83,6 @@ impl NostradeWallet {
             if history.is_empty() {
                 break;
             }
-            web_sys::console::log_1(&format!("Syncing wallet with {history:?}").into()); // TODO: remove
             let transactions = client.get_transactions(&history).await?;
             for tx in transactions {
                 if wollet.apply_transaction(tx).is_err() {
@@ -89,13 +90,14 @@ impl NostradeWallet {
                 }
             }
             let updates = wollet.updates()?;
-            web_sys::console::log_1(&format!("Syncing wallet with {updates:?}").into());
             for update in updates {
-                if let Err(e) = persistor.push(update.clone()).await {
+                if let Err(e) = persistor.push_update(update.clone()).await {
                     web_sys::console::error_1(&format!("Failed to persist update: {e}").into());
                 }
             }
         }
+        drop(client);
+        drop(wollet);
         Ok(())
     }
     pub async fn full_sync(&self) -> Result<(), NostradeWalletError> {
@@ -106,36 +108,13 @@ impl NostradeWallet {
         let mut client = ESPLORA_CLIENT.write().await;
         let mut wollet = self.wollet.write().await;
 
-        let Some(update) = client.full_scan(&*wollet).await? else {
+        let Some(update) = client.full_scan(&wollet).await? else {
             return Ok(());
         };
-        persistor.push(update.clone()).await?;
+        drop(client);
+        persistor.push_update(update.clone()).await?;
         wollet.apply_update_no_persist(update)?;
-
-        // let tip = client.tip().await?; // latest block
-        // let history = client
-        //     .get_scripts_history(&[&last_unused])
-        //     .await?
-        //     .iter()
-        //     .flatten()
-        //     .map(|tx| tx.txid)
-        //     .collect::<Vec<_>>();
-        // web_sys::console::log_1(&format!("Syncing wallet with {history:?}").into()); // TODO: remove
-        // let transactions = client.get_transactions(&history).await?;
-        // drop(client);
-        // for tx in transactions {
-        //     if wollet.apply_transaction(tx).is_err() {
-        //         web_sys::console::error_1(&"Failed to apply transaction".into());
-        //     }
-        // }
-        // let updates = wollet.updates()?;
-        // web_sys::console::log_1(&format!("Syncing wallet with {updates:?}").into());
-        // drop(wollet);
-        // for update in updates {
-        //     if let Err(e) = persistor.push(update.clone()).await {
-        //         web_sys::console::error_1(&format!("Failed to persist update: {e}").into());
-        //     }
-        // }
+        drop(wollet);
         Ok(())
     }
     pub async fn balance(
@@ -148,8 +127,18 @@ impl NostradeWallet {
         Ok(wollet.address(None).map(|addr| addr.address().clone())?)
     }
     pub async fn utxos(&self) -> Result<Vec<lwk_wollet::WalletTxOut>, NostradeWalletError> {
+        let Some(persistor) = &self.persistor else {
+            return Err(NostradeWalletError::NoPersister);
+        };
         let wollet = self.wollet.read().await;
-        Ok(wollet.utxos()?)
+        let all_utxos = wollet.utxos()?;
+        drop(wollet);
+        let contracted_utxo_ids = persistor.get_proposal_utxos().await?;
+        let available_utxos = all_utxos
+            .into_iter()
+            .filter(|utxo| !contracted_utxo_ids.contains(&utxo.outpoint.txid))
+            .collect::<Vec<_>>();
+        Ok(available_utxos)
     }
     pub async fn transactions(&self) -> Result<Vec<lwk_wollet::WalletTx>, NostradeWalletError> {
         let wollet = self.wollet.read().await;
@@ -162,9 +151,23 @@ impl NostradeWallet {
         amount: u64,
         asset_id: elements::AssetId,
     ) -> Result<elements::Txid, NostradeWalletError> {
+        let Some(persistor) = &self.persistor else {
+            return Err(NostradeWalletError::NoPersister);
+        };
         let wollet = self.wollet.write().await;
+        let contracted_utxo_ids = persistor.get_proposal_utxos().await?;
+
+        let available_utxos = wollet
+            .utxos()?
+            .into_iter()
+            .filter_map(|utxo| {
+                (!contracted_utxo_ids.contains(&utxo.outpoint.txid)).then_some(utxo.outpoint)
+            })
+            .collect::<Vec<_>>();
+
         let mut pset = wollet
             .tx_builder()
+            .set_wallet_utxos(available_utxos)
             // TODO: PROPER UTXO SELECTION
             .add_recipient(recipient, amount, asset_id)?
             .fee_rate(Some(100.)) // Adjust fee rate as needed
@@ -172,13 +175,10 @@ impl NostradeWallet {
         lwk_common::Signer::sign(&self.signer, &mut pset)?;
         let tx = wollet.finalize(&mut pset)?;
         let tx_id = ESPLORA_CLIENT.write().await.broadcast(&tx).await?;
-        let Some(persistor) = &self.persistor else {
-            return Err(NostradeWalletError::NoPersister);
-        };
         let updates = wollet.updates()?;
 
         for update in updates {
-            if let Err(e) = persistor.push(update.clone()).await {
+            if let Err(e) = persistor.push_update(update.clone()).await {
                 web_sys::console::error_1(&format!("Failed to persist update: {e}").into());
             }
         }
@@ -256,7 +256,7 @@ impl NostradeWallet {
         drop(wollet);
 
         for update in updates {
-            if let Err(e) = persistor.push(update.clone()).await {
+            if let Err(e) = persistor.push_update(update.clone()).await {
                 web_sys::console::error_1(&format!("Failed to persist update: {e}").into());
             }
         }
@@ -309,11 +309,7 @@ pub type NostradeWalletStore = UseReducerHandle<NostradeWallet>;
 #[function_component(WalletProvider)]
 pub fn language_config_provider(props: &yew::html::ChildrenProps) -> HtmlResult {
     let Some(mut nostr_key) = nostr_minions::use_nostr_key() else {
-        return Ok(html! {
-            <div class="flex flex-col items-center justify-evenly h-screen w-screen p-4">
-                <crate::NostrLogin />
-            </div>
-        });
+        return Ok(html! {});
     };
     nostr_key.set_extractable(true);
     let mnemonic = nostr_key
