@@ -1,10 +1,10 @@
 use yew::prelude::*;
 
-static ESPLORA_CLIENT: std::sync::LazyLock<
+pub static ESPLORA_CLIENT: std::sync::LazyLock<
     tokio::sync::RwLock<lwk_wollet::clients::asyncr::EsploraClient>,
 > = std::sync::LazyLock::new(|| {
     lwk_wollet::clients::asyncr::EsploraClientBuilder::new(
-        "https://blockstream.info/liquidtestnet/api/",
+        "https://liquid.network/liquidtestnet/api/",
         lwk_wollet::ElementsNetwork::LiquidTestnet,
     )
     .timeout(3)
@@ -25,6 +25,8 @@ pub enum NostradeWalletError {
     Persist(#[from] crate::persister::PersistError),
     #[error("No IDB")]
     NoPersister,
+    #[error("No UTXO found")]
+    NoUtxo,
 }
 
 #[derive(Clone, Debug)]
@@ -36,10 +38,10 @@ pub struct NostradeWallet {
     persistor: Option<crate::persister::IdbPersister>,
 }
 impl NostradeWallet {
-    pub fn loaded(&self) -> bool {
+    pub const fn loaded(&self) -> bool {
         self.loaded
     }
-    pub fn synced(&self) -> bool {
+    pub const fn synced(&self) -> bool {
         self.synced > 0
     }
     pub async fn load(&self) -> Result<(), NostradeWalletError> {
@@ -59,24 +61,81 @@ impl NostradeWallet {
 
         Ok(())
     }
-    pub async fn sync(&self) -> Result<(), NostradeWalletError> {
-        let mut client = ESPLORA_CLIENT.write().await;
-        if client.tip().await.map(|tip| tip.height).ok()
-            == Some(self.wollet.read().await.tip().height())
-        {
-            return Ok(());
-        }
-        let Some(update) = client.full_scan(&*self.wollet.read().await).await? else {
-            return Ok(());
-        };
-        self.wollet
-            .write()
-            .await
-            .apply_update_no_persist(update.clone())?;
+    pub async fn simple_sync(&self) -> Result<(), NostradeWalletError> {
+        let last_unused = self.address().await?;
         let Some(persistor) = &self.persistor else {
+            web_sys::console::error_1(&"No persistor found".into());
             return Err(NostradeWalletError::NoPersister);
         };
-        persistor.push(update).await?;
+        let client = ESPLORA_CLIENT.write().await;
+        let mut wollet = self.wollet.write().await;
+        loop {
+            let last_unused = wollet.address(None)?.address().script_pubkey();
+            let history = client
+                .get_scripts_history(&[&last_unused])
+                .await?
+                .iter()
+                .flatten()
+                .map(|tx| tx.txid)
+                .collect::<Vec<_>>();
+            if history.is_empty() {
+                break;
+            }
+            web_sys::console::log_1(&format!("Syncing wallet with {history:?}").into()); // TODO: remove
+            let transactions = client.get_transactions(&history).await?;
+            for tx in transactions {
+                if wollet.apply_transaction(tx).is_err() {
+                    web_sys::console::error_1(&"Failed to apply transaction".into());
+                }
+            }
+            let updates = wollet.updates()?;
+            web_sys::console::log_1(&format!("Syncing wallet with {updates:?}").into());
+            for update in updates {
+                if let Err(e) = persistor.push(update.clone()).await {
+                    web_sys::console::error_1(&format!("Failed to persist update: {e}").into());
+                }
+            }
+        }
+        Ok(())
+    }
+    pub async fn full_sync(&self) -> Result<(), NostradeWalletError> {
+        let Some(persistor) = &self.persistor else {
+            web_sys::console::error_1(&"No persistor found".into());
+            return Err(NostradeWalletError::NoPersister);
+        };
+        let mut client = ESPLORA_CLIENT.write().await;
+        let mut wollet = self.wollet.write().await;
+
+        let Some(update) = client.full_scan(&*wollet).await? else {
+            return Ok(());
+        };
+        persistor.push(update.clone()).await?;
+        wollet.apply_update_no_persist(update)?;
+
+        // let tip = client.tip().await?; // latest block
+        // let history = client
+        //     .get_scripts_history(&[&last_unused])
+        //     .await?
+        //     .iter()
+        //     .flatten()
+        //     .map(|tx| tx.txid)
+        //     .collect::<Vec<_>>();
+        // web_sys::console::log_1(&format!("Syncing wallet with {history:?}").into()); // TODO: remove
+        // let transactions = client.get_transactions(&history).await?;
+        // drop(client);
+        // for tx in transactions {
+        //     if wollet.apply_transaction(tx).is_err() {
+        //         web_sys::console::error_1(&"Failed to apply transaction".into());
+        //     }
+        // }
+        // let updates = wollet.updates()?;
+        // web_sys::console::log_1(&format!("Syncing wallet with {updates:?}").into());
+        // drop(wollet);
+        // for update in updates {
+        //     if let Err(e) = persistor.push(update.clone()).await {
+        //         web_sys::console::error_1(&format!("Failed to persist update: {e}").into());
+        //     }
+        // }
         Ok(())
     }
     pub async fn balance(
@@ -97,14 +156,6 @@ impl NostradeWallet {
         Ok(wollet.transactions()?)
     }
 
-    pub const FED_PEG_DESC: &str = "wsh(or_d(multi(11,020e0338c96a8870479f2396c373cc7696ba124e8635d41b0ea581112b67817261,02675333a4e4b8fb51d9d4e22fa5a8eaced3fdac8a8cbf9be8c030f75712e6af99,02896807d54bc55c24981f24a453c60ad3e8993d693732288068a23df3d9f50d48,029e51a5ef5db3137051de8323b001749932f2ff0d34c82e96a2c2461de96ae56c,02a4e1a9638d46923272c266631d94d36bdb03a64ee0e14c7518e49d2f29bc4010,031c41fdbcebe17bec8d49816e00ca1b5ac34766b91c9f2ac37d39c63e5e008afb,03079e252e85abffd3c401a69b087e590a9b86f33f574f08129ccbd3521ecf516b,03111cf405b627e22135b3b3733a4a34aa5723fb0f58379a16d32861bf576b0ec2,0318f331b3e5d38156da6633b31929c5b220349859cc9ca3d33fb4e68aa0840174,03230dae6b4ac93480aeab26d000841298e3b8f6157028e47b0897c1e025165de1,035abff4281ff00660f99ab27bb53e6b33689c2cd8dcd364bc3c90ca5aea0d71a6,03bd45cddfacf2083b14310ae4a84e25de61e451637346325222747b157446614c,03cc297026b06c71cbfa52089149157b5ff23de027ac5ab781800a578192d17546,03d3bde5d63bdb3a6379b461be64dad45eabff42f758543a9645afd42f6d424828,03ed1e8d5109c9ed66f7941bc53cc71137baa76d50d274bda8d5e8ffbd6e61fe9a),and_v(v:older(4032),multi(2,03aab896d53a8e7d6433137bbba940f9c521e085dd07e60994579b64a6d992cf79,0291b7d0b1b692f8f524516ed950872e5da10fb1b808b5a526dedc6fed1cf29807,0386aa9372fbab374593466bc5451dc59954e90787f08060964d95c87ef34ca5bb))))#7jwwklk4";
-    pub async fn pegin_address(&self) -> Result<String, NostradeWalletError> {
-        let wollet = self.wollet.read().await;
-        let fed_desc = Self::FED_PEG_DESC.parse().unwrap();
-        Ok(wollet
-            .pegin_address(None, fed_desc)
-            .map(|addr| addr.address().to_string())?)
-    }
     pub async fn send_coins(
         &self,
         recipient: &elements::Address,
@@ -114,8 +165,9 @@ impl NostradeWallet {
         let wollet = self.wollet.write().await;
         let mut pset = wollet
             .tx_builder()
+            // TODO: PROPER UTXO SELECTION
             .add_recipient(recipient, amount, asset_id)?
-            .fee_rate(Some(200.)) // Adjust fee rate as needed
+            .fee_rate(Some(100.)) // Adjust fee rate as needed
             .finish()?;
         lwk_common::Signer::sign(&self.signer, &mut pset)?;
         let tx = wollet.finalize(&mut pset)?;
@@ -130,32 +182,85 @@ impl NostradeWallet {
                 web_sys::console::error_1(&format!("Failed to persist update: {e}").into());
             }
         }
+        drop(wollet);
         Ok(tx_id)
     }
+
+    pub async fn sized_liquidex_proposal(
+        &self,
+        input_asset: elements::AssetId,
+        desired_size: u64,
+        output_asset: elements::AssetId,
+        swap_amount: u64,
+    ) -> Result<lwk_wollet::LiquidexProposal<lwk_wollet::Unvalidated>, NostradeWalletError> {
+        let address = self.address().await?;
+        let tx = self.send_coins(&address, desired_size, input_asset).await?;
+        let client = ESPLORA_CLIENT.write().await;
+        let mut wollet = self.wollet.write().await;
+        let tx_details = client.get_transactions(&[tx]).await?;
+        drop(client);
+        for tx in tx_details {
+            wollet.apply_transaction(tx)?;
+        }
+        web_sys::console::log_1(&format!("Applied tx: {tx}").into());
+        drop(wollet);
+
+        let matching_utxo = self
+            .utxos()
+            .await?
+            .into_iter()
+            .find(|utxo| utxo.unblinded.value == desired_size)
+            .ok_or(NostradeWalletError::NoUtxo)?;
+        let pset = self
+            .liquidex_proposal(matching_utxo.outpoint, &address, swap_amount, output_asset)
+            .await?;
+        web_sys::console::log_1(&format!("Found UTXO: {matching_utxo:?}").into());
+
+        Ok(pset)
+    }
+
     pub async fn liquidex_proposal(
         &self,
         utxo: elements::OutPoint,
         recipient: &elements::Address,
         amount: u64,
         asset_id: elements::AssetId,
-    ) -> Result<lwk_wollet::LiquidexProposal<lwk_wollet::Unvalidated>, ()> {
+    ) -> Result<lwk_wollet::LiquidexProposal<lwk_wollet::Unvalidated>, NostradeWalletError> {
         let wollet = self.wollet.read().await;
         let mut pset = wollet
             .tx_builder()
-            .liquidex_make(utxo, recipient, amount, asset_id)
-            .unwrap()
-            .finish()
-            .map_err(|e| {
-                web_sys::console::error_1(
-                    &format!("Failed to build Liquidex proposal: {e}").into(),
-                );
-            })?;
-        lwk_common::Signer::sign(&self.signer, &mut pset).map_err(|_| {
-            web_sys::console::error_1(&"Failed to sign Liquidex proposal".into());
-        })?;
-        lwk_wollet::LiquidexProposal::from_pset(&pset).map_err(|e| {
-            web_sys::console::error_1(&format!("Failed to create Liquidex proposal: {e}").into());
-        })
+            .liquidex_make(utxo, recipient, amount, asset_id)?
+            // .add_recipient("<ILLUMINODES ADDRESS>", 1000, "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49")?
+            .finish()?;
+        drop(wollet);
+        lwk_common::Signer::sign(&self.signer, &mut pset)?;
+        Ok(lwk_wollet::LiquidexProposal::from_pset(&pset)?)
+    }
+    pub async fn liquidex_take(
+        &self,
+        proposal: lwk_wollet::LiquidexProposal<lwk_wollet::Validated>,
+    ) -> Result<(), NostradeWalletError> {
+        let wollet = self.wollet.read().await;
+        let mut pset = wollet
+            .tx_builder()
+            .liquidex_take(vec![proposal])?
+            // .add_recipient("<ILLUMINODES ADDRESS>", 1000, "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49")?
+            .finish()?;
+        lwk_common::Signer::sign(&self.signer, &mut pset)?;
+        let tx = wollet.finalize(&mut pset)?;
+        let _tx_id = ESPLORA_CLIENT.write().await.broadcast(&tx).await?;
+        let Some(persistor) = &self.persistor else {
+            return Err(NostradeWalletError::NoPersister);
+        };
+        let updates = wollet.updates()?;
+        drop(wollet);
+
+        for update in updates {
+            if let Err(e) = persistor.push(update.clone()).await {
+                web_sys::console::error_1(&format!("Failed to persist update: {e}").into());
+            }
+        }
+        Ok(())
     }
 }
 
@@ -249,6 +354,11 @@ pub fn language_config_provider(props: &yew::html::ChildrenProps) -> HtmlResult 
 }
 
 #[hook]
+pub fn use_wallet_ctx() -> NostradeWalletStore {
+    use_context::<NostradeWalletStore>().expect("No wallet context found")
+}
+
+#[hook]
 pub fn use_wallet_address() -> Option<elements::Address> {
     let wallet_ctx = use_context::<NostradeWalletStore>().expect("No wallet context found");
     let ctx_clone = wallet_ctx.clone();
@@ -269,28 +379,6 @@ pub fn use_wallet_address() -> Option<elements::Address> {
     )
     .ok()?;
     (*address).clone().ok()
-}
-
-#[hook]
-pub fn use_pegin_address()
--> Result<yew::suspense::UseFutureHandle<Option<String>>, yew::suspense::Suspension> {
-    let wallet_ctx = use_context::<NostradeWalletStore>().expect("No wallet context found");
-    let ctx_clone = wallet_ctx.clone();
-    yew::suspense::use_future_with(
-        (wallet_ctx.loaded, wallet_ctx.synced),
-        |loaded| async move {
-            if !loaded.0 {
-                return None;
-            }
-            match ctx_clone.pegin_address().await {
-                Ok(address) => Some(address),
-                Err(e) => {
-                    web_sys::console::error_1(&format!("Failed to get pegin address: {e}").into());
-                    None
-                }
-            }
-        },
-    )
 }
 
 #[hook]

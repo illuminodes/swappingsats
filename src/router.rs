@@ -15,6 +15,8 @@ pub enum AppRoute {
     Keys,
     #[at("/history")]
     History,
+    #[at("/orderbook")]
+    OrderBook,
 }
 
 #[function_component(MainPages)]
@@ -26,9 +28,14 @@ pub fn main_pages() -> Html {
                 AppRoute::Home => html! { <crate::DashboardScreen /> },
                 AppRoute::Receive => html! { <crate::ReceiveCoinsScreen /> },
                 AppRoute::SendCoins => html! { <crate::SendCoinsScreen /> },
-                AppRoute::Swap => html! { <crate::SwapCoinsScreen /> },
+                AppRoute::Swap => html! {
+                    <>
+                    <crate::SwapCoinsScreen />
+                    </>
+                },
                 AppRoute::Keys => html! { <></> },
                 AppRoute::History => html! { <crate::WalletHistoryScreen /> },
+                AppRoute::OrderBook => html! { <crate::OrderBookScreen /> },
             }
         }} />
         <BottomNavigation />
@@ -69,6 +76,15 @@ pub fn bottom_navigation() -> HtmlResult {
                   }>
                       // <lucide_yew::Settings class="w-5 h-5 mb-1" />
                       <span class="text-xs">{"Settings"}</span>
+                  </button>
+              </yew_router::components::Link<crate::router::AppRoute>>
+              <yew_router::components::Link<crate::router::AppRoute>
+                  to={crate::router::AppRoute::OrderBook}>
+                  <button class={
+                    classes!(base_class.clone(), if current_route == Some(AppRoute::OrderBook) { "text-blue-600" } else { "text-gray-500" })
+                  }>
+                      // <lucide_yew::Settings class="w-5 h-5 mb-1" />
+                      <span class="text-xs">{"Order Book"}</span>
                   </button>
               </yew_router::components::Link<crate::router::AppRoute>>
         </div>

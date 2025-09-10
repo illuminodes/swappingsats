@@ -5,6 +5,77 @@ pub struct SwapCoinsScreenProps {
     pub utxo_to_swap: UseStateHandle<Option<lwk_wollet::WalletTxOut>>,
 }
 
+#[function_component(SwapTesting)]
+pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
+    let utxo_to_swap = props.utxo_to_swap.clone();
+    let wallet_ctx = use_context::<crate::wallet_provider::NostradeWalletStore>()
+        .expect("No wallet context found");
+    let nostr_key = nostr_minions::use_nostr_key();
+    let relay_ctx = nostr_minions::use_nostr_relay_pool();
+    let onclick = {
+        Callback::from(move |form_event: SubmitEvent| {
+            form_event.prevent_default();
+            let form = form_event.target_unchecked_into::<web_sys::HtmlFormElement>();
+            let Some(swap_amount) = form
+                .get_with_name("swap_amount")
+                .map(wasm_bindgen::JsCast::unchecked_into::<web_sys::HtmlInputElement>)
+                .and_then(|input| input.value().parse::<u64>().ok())
+            else {
+                return;
+            };
+            let Some(nostr_key) = nostr_key.clone() else {
+                return;
+            };
+            let Some(utxo) = utxo_to_swap.as_ref().cloned() else {
+                return;
+            };
+            let wallet = wallet_ctx.clone();
+            let relay = relay_ctx.clone();
+
+            let asset_id = match utxo.unblinded.asset.to_string().as_str() {
+                "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => {
+                    "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5"
+                }
+                "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => {
+                    "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49"
+                }
+                _ => "Unknown Asset",
+            }.parse::<elements::AssetId>().expect("Failed to parse asset id");
+            yew::platform::spawn_local(async move {
+                let address = wallet.address().await.expect("Failed to get address");
+                let proposal = wallet
+                    .liquidex_proposal(utxo.outpoint, &address, swap_amount, asset_id)
+                    .await
+                    .expect("Failed to create proposal");
+                web_sys::console::log_1(&format!("{proposal:?}").into());
+                let mut proposal_note = nostr_minions::nostro2::NostrNote {
+                    content: serde_json::to_string(&proposal).unwrap(),
+                    kind: 32121,
+                    ..Default::default()
+                };
+                proposal_note
+                    .tags
+                    .add_parameter_tag(proposal.needed_tx().unwrap().to_string().as_str());
+
+                nostr_key.sign_note(&mut proposal_note);
+                web_sys::console::log_1(&format!("{proposal_note:?}").into());
+                // TODO: SEND TO NOSTR
+                // TODO: SAVE PROPOSAL TO LOCAL STORAGE
+                let _ = relay.send(proposal_note);
+            })
+        })
+    };
+
+    Ok(html! {
+        <form onsubmit={onclick}>
+            <input type="number" min="0" step="1000" name="input_amount" placeholder="Input Amount" />
+            <input type="number" min="0" step="1" name="swap_amount" placeholder="Swap Amount" />
+
+            <input type="submit" value="Submit" />
+        </form>
+    })
+}
+
 #[function_component(SwapCoinsScreen)]
 pub fn swap_coins_screen() -> HtmlResult {
     let utxo_to_swap = use_state(|| None::<lwk_wollet::WalletTxOut>);
@@ -40,9 +111,16 @@ pub fn swap_coins_screen() -> HtmlResult {
                 <button class="w-9"/>
             </div>
             // <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
-            {if let Some(_utxo) = (*utxo_to_swap).clone() {
+            {if let Some(utxo) = (*utxo_to_swap).clone() {
                 html! {
-                    <UtxoToSwap utxo_to_swap={utxo_to_swap.clone()} />
+                    // <UtxoToSwap utxo_to_swap={utxo_to_swap.clone()} />
+                    <yew::suspense::Suspense fallback={html! {
+                        <div class="w-full items-center justify-center flex p-4">
+                            // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
+                        </div>
+                    }}>
+                        <SwapTesting  utxo_to_swap={utxo_to_swap.clone()} />
+                    </yew::suspense::Suspense>
                 }
             } else {
                 html! {
@@ -151,7 +229,6 @@ pub struct SwapNotificationProps {
 
 #[function_component(SwapNotification)]
 pub fn swap_notification(props: &SwapNotificationProps) -> HtmlResult {
-
     Ok(html! {
         <div class="p-4 border border-gray-200 rounded-lg shadow-sm max-w-xs">
             <h3 class="font-semibold mb-2">{"Swap Accepted"}</h3>

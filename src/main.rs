@@ -1,4 +1,5 @@
 #![warn(clippy::all, clippy::pedantic, clippy::perf, clippy::nursery)]
+#![allow(clippy::future_not_send)]
 
 pub mod components;
 
@@ -80,17 +81,16 @@ fn wallet_load() -> Html {
             yew::platform::spawn_local(async move {
                 // loop {
                 sync_handle.set(true);
-                gloo::timers::future::sleep(std::time::Duration::from_secs(1)).await;
-                web_sys::console::log_1(&"Syncing wallet...".into());
-                if ctx_clone.sync().await.is_ok() {
+                // // web_sys::console::log_1(&"Syncing wallet...".into());
+                if ctx_clone.simple_sync().await.is_ok() {
                     ctx_clone.dispatch(wallet_provider::NostradeWalletAction::Synced);
                     web_sys::console::log_1(&"Wallet synced successfully".into());
                 } else {
-                    web_sys::console::error_1(&"Failed to sync wallet".into());
+                      web_sys::console::error_1(&"Failed to sync wallet".into());
                 }
                 sync_handle.set(false);
-                //    gloo::timers::future::sleep(std::time::Duration::from_secs(180)).await;
-                //}
+                //     gloo::timers::future::sleep(std::time::Duration::from_secs(180)).await;
+                // }
             });
         }
         || ()
@@ -110,7 +110,7 @@ fn wallet_load() -> Html {
                 let ctx = ctx.clone();
                 yew::platform::spawn_local(async move {
                     sync_handle.set(true);
-                    if ctx.sync().await.is_ok() {
+                    if ctx.full_sync().await.is_ok() {
                         ctx.dispatch(wallet_provider::NostradeWalletAction::Synced);
                         web_sys::console::log_1(&"Wallet synced successfully".into());
                     } else {

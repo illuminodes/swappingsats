@@ -175,7 +175,7 @@ pub struct BitcoinQrCodeProps {
 
 #[function_component(BitcoinQrCode)]
 pub fn bitcoin_qr(props: &BitcoinQrCodeProps) -> Html {
-    let qrcode = fast_qr::QRBuilder::new("https://example.com/")
+    let qrcode = fast_qr::QRBuilder::new(props.address.clone())
         .build()
         .unwrap();
     let mut svg = fast_qr::convert::svg::SvgBuilder::default();
