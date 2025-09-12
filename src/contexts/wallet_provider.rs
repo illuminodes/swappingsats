@@ -29,6 +29,8 @@ pub enum NostradeWalletError {
     NoPersister,
     #[error("No UTXO found")]
     NoUtxo,
+    #[error("No proposal found")]
+    Pset(#[from] elements::pset::Error),
 }
 
 #[derive(Clone, Debug)]
@@ -96,8 +98,24 @@ impl NostradeWallet {
             .into_iter()
             .filter(|utxo| !contracted_utxo_ids.contains(&utxo.outpoint.txid))
             .collect::<Vec<_>>();
+        web_sys::console::log_1(&format!("available_utxos: {}", available_utxos.len()).into());
         Ok(available_utxos)
     }
+    pub async fn locked_utxos(&self) -> Result<Vec<lwk_wollet::WalletTxOut>, NostradeWalletError> {
+        let Some(persistor) = &self.persistor else {
+            return Err(NostradeWalletError::NoPersister);
+        };
+        let wollet = self.wollet.read().await;
+        let all_utxos = wollet.utxos()?;
+        drop(wollet);
+        let contracted_utxo_ids = persistor.get_proposal_utxos().await?;
+        let locked_utxos = all_utxos
+            .into_iter()
+            .filter(|utxo| contracted_utxo_ids.contains(&utxo.outpoint.txid))
+            .collect::<Vec<_>>();
+        Ok(locked_utxos)
+    }
+
     pub async fn transactions(&self) -> Result<Vec<lwk_wollet::WalletTx>, NostradeWalletError> {
         let wollet = self.wollet.read().await;
         Ok(wollet.transactions()?)
@@ -119,7 +137,6 @@ impl NostradeWallet {
         let mut pset = wollet
             .tx_builder()
             .set_wallet_utxos(available_utxos)
-            // TODO: PROPER UTXO SELECTION
             .add_recipient(recipient, amount, asset_id)?
             .fee_rate(Some(100.)) // Adjust fee rate as needed
             .finish()?;
@@ -131,11 +148,6 @@ impl NostradeWallet {
         let Some(persistor) = &self.persistor else {
             return Err(NostradeWalletError::NoPersister);
         };
-        for update in updates {
-            if let Err(e) = persistor.push_update(update.clone()).await {
-                web_sys::console::error_1(&format!("Failed to persist update: {e}").into());
-            }
-        }
         drop(wollet);
         Ok(tx_id)
     }
@@ -151,7 +163,8 @@ impl NostradeWallet {
         let mut pset = wollet
             .tx_builder()
             .liquidex_make(utxo, recipient, amount, asset_id)?
-            // .add_recipient("<ILLUMINODES ADDRESS>", 1000, "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49")?
+            // Maker pays the platform fee
+            // .add_recipient(&crate::ILLUMINODES_ADDRESS, 1000, *crate::T_L_BTC_ASSET_ID)?
             .finish()?;
         drop(wollet);
         lwk_common::Signer::sign(&self.signer, &mut pset)?;
@@ -163,13 +176,29 @@ impl NostradeWallet {
         proposal: lwk_wollet::LiquidexProposal<lwk_wollet::Validated>,
     ) -> Result<(), NostradeWalletError> {
         let wollet = self.wollet.read().await;
+        let mut fee_pset = wollet
+            .tx_builder()
+            .add_recipient(&crate::ILLUMINODES_ADDRESS, 1000, *crate::T_L_BTC_ASSET_ID)?
+            .finish()?;
+        lwk_common::Signer::sign(&self.signer, &mut fee_pset)?;
+        web_sys::console::log_1(&format!("Signed fee pset").into());
         let mut pset = wollet
             .tx_builder()
             .liquidex_take(vec![proposal])?
-            // .add_recipient("<ILLUMINODES ADDRESS>", 1000, "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49")?
+            // .add_recipient(&crate::ILLUMINODES_ADDRESS, 1000, *crate::T_L_BTC_ASSET_ID)?
             .finish()?;
         lwk_common::Signer::sign(&self.signer, &mut pset)?;
-        let tx = wollet.finalize(&mut pset)?;
+        web_sys::console::log_1(&format!("Signed proposal pset").into());
+        for input in fee_pset.inputs() {
+            pset.add_input(input.clone());
+        }
+        for output in fee_pset.outputs() {
+            pset.add_output(output.clone());
+        }
+        web_sys::console::log_1(&format!("Merged psets").into());
+
+        let tx = wollet.finalize(&mut fee_pset)?;
+        web_sys::console::log_1(&format!("Finalized tx").into());
         let _tx_id = ESPLORA_CLIENT.write().await.broadcast(&tx).await?;
         let Some(persistor) = &self.persistor else {
             return Err(NostradeWalletError::NoPersister);
@@ -184,6 +213,26 @@ impl NostradeWallet {
         }
         Ok(())
     }
+    pub async fn hard_cancel_swap(
+        &self,
+        utxo: lwk_wollet::WalletTxOut,
+    ) -> Result<(), NostradeWalletError> {
+        let Some(persistor) = &self.persistor else {
+            return Err(NostradeWalletError::NoPersister);
+        };
+        let wallet = self.wollet.read().await;
+        let mut pset = wallet
+            .tx_builder()
+            .set_wallet_utxos(vec![utxo.outpoint])
+            .add_burn(1, utxo.unblinded.asset)?
+            .finish()?;
+        lwk_common::Signer::sign(&self.signer, &mut pset)?;
+        let tx = wallet.finalize(&mut pset)?;
+        let tx_id = ESPLORA_CLIENT.write().await.broadcast(&tx).await?;
+        persistor.delete_proposal(tx_id).await?;
+        drop(wallet);
+        Ok(())
+    }
 }
 
 impl PartialEq for NostradeWallet {
@@ -193,7 +242,6 @@ impl PartialEq for NostradeWallet {
 }
 
 pub enum NostradeWalletAction {
-    Loaded,
     Synced,
 }
 
@@ -202,24 +250,12 @@ impl Reducible for NostradeWallet {
 
     fn reduce(self: std::rc::Rc<Self>, action: Self::Action) -> std::rc::Rc<Self> {
         match action {
-            NostradeWalletAction::Loaded => {
-                web_sys::console::log_1(&"Wallet loaded".into());
-                std::rc::Rc::new(Self {
-                    synced: self.synced,
-                    wollet: self.wollet.clone(),
-                    persistor: self.persistor.clone(),
-                    signer: self.signer.clone(),
-                })
-            }
-            NostradeWalletAction::Synced => {
-                web_sys::console::log_1(&"Wallet synced".into());
-                std::rc::Rc::new(Self {
-                    synced: self.synced + 1,
-                    wollet: self.wollet.clone(),
-                    persistor: self.persistor.clone(),
-                    signer: self.signer.clone(),
-                })
-            }
+            NostradeWalletAction::Synced => std::rc::Rc::new(Self {
+                synced: self.synced + 1,
+                wollet: self.wollet.clone(),
+                persistor: self.persistor.clone(),
+                signer: self.signer.clone(),
+            }),
         }
     }
 }
@@ -340,5 +376,50 @@ pub fn use_wallet_transactions()
                 vec![]
             }
         }
+    })
+}
+
+#[hook]
+pub fn use_wallet_locked_utxos()
+-> Result<yew::suspense::UseFutureHandle<Vec<lwk_wollet::WalletTxOut>>, yew::suspense::Suspension> {
+    let wallet_ctx = use_context::<NostradeWalletStore>().expect("No wallet context found");
+    let ctx_clone = wallet_ctx.clone();
+    yew::suspense::use_future_with(wallet_ctx.synced, |_| async move {
+        match ctx_clone.locked_utxos().await {
+            Ok(utxos) => utxos,
+            Err(e) => {
+                web_sys::console::error_1(&format!("Failed to get locked UTXOs: {e}").into());
+                vec![]
+            }
+        }
+    })
+}
+
+#[hook]
+pub fn use_hard_cancel_swap() -> Callback<lwk_wollet::WalletTxOut> {
+    let wallet_ctx = use_context::<NostradeWalletStore>().expect("No wallet context found");
+    Callback::from(move |utxo| {
+        let wallet = wallet_ctx.clone();
+        yew::platform::spawn_local(async move {
+            wallet
+                .hard_cancel_swap(utxo)
+                .await
+                .expect("Failed to cancel swap");
+        });
+    })
+}
+
+#[hook]
+pub fn use_soft_cancel_swap() -> Callback<elements::Txid> {
+    let wallet = use_context::<NostradeWalletStore>().expect("No wallet context found");
+    Callback::from(move |txid| {
+        let Some(persistor) = wallet.persistor().cloned() else {
+            return;
+        };
+        yew::platform::spawn_local(async move {
+            if let Err(e) = persistor.delete_proposal(txid).await {
+                web_sys::console::error_1(&format!("Failed to delete proposal: {e}").into());
+            }
+        });
     })
 }

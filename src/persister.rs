@@ -144,6 +144,15 @@ impl IdbPersister {
             .collect::<Vec<_>>();
         Ok(proposals)
     }
+    pub async fn delete_proposal(&self, txid: elements::Txid) -> Result<(), PersistError> {
+        let tx = self
+            .db
+            .transaction(&[PROPOSALS_STORE_NAME], idb::TransactionMode::ReadWrite)?;
+        let store = tx.object_store(PROPOSALS_STORE_NAME)?;
+        store.delete(serde_wasm_bindgen::to_value(&txid)?)?.await?;
+        tx.commit()?.await?;
+        Ok(())
+    }
     pub async fn get_all_proposals(&self) -> Result<Vec<PersistedProposal>, PersistError> {
         let tx = self
             .db

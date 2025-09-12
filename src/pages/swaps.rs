@@ -140,6 +140,7 @@ pub fn swap_coins_screen() -> HtmlResult {
                         </div>
                     }}>
                         <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
+                        <LockedUtxos utxo_to_swap={utxo_to_swap.clone()} />
                     </Suspense>
                 }
             }}
@@ -231,6 +232,70 @@ pub fn utxo_to_swap(props: &SwapCoinsScreenProps) -> HtmlResult {
             </div>
     })
 }
+
+#[function_component(LockedUtxos)]
+pub fn locked_utxos(props: &SwapCoinsScreenProps) -> HtmlResult {
+    let locked_utxos = crate::use_wallet_locked_utxos()?;
+    let to_swap = props.utxo_to_swap.setter();
+    let hard_cancel_swap = crate::use_hard_cancel_swap();
+    let soft_cancel_swap = crate::use_soft_cancel_swap();
+    Ok(html! {
+            <div>
+                <h2 class="font-semibold mb-4 px-6 mt-3">{"Locked UTXOs"}</h2>
+                <div class="max-h-108 overflow-y-auto px-6 snap-y snap-mandatory">
+                { locked_utxos.iter().map(|utxo| {
+                    let (image_url, asset_name, units) = match utxo.unblinded.asset.to_string().as_str() {
+                        "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => (
+                            "https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png",
+                            "L-BTC",
+                            "sats",
+                        ),
+                        "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => (
+                            "https://tether.to/images/logoCircle.png",
+                            "USDT",
+                            "USD",
+                        ),
+                        _ => ("", "Unknown Asset", "Unknown"),
+                    };
+                    let onclick = {
+                        let utxo_to_swap = to_swap.clone();
+                        let utxo = utxo.clone();
+                        Callback::from(move |_| {
+                            utxo_to_swap.set(Some(utxo.clone()));
+                        })
+                    };
+                    let tx_id = utxo.outpoint.txid;
+                    let utxo_clone = utxo.clone();
+                    let soft_cancel_swap = soft_cancel_swap.clone().reform(move |_| tx_id);
+                    let hard_cancel_swap = hard_cancel_swap.clone().reform(move |_| utxo_clone.clone());
+
+                    html! {
+                        <div {onclick} class="p-4 mb-2 border border-gray-200 rounded-lg shadow-sm max-w-xs snap-start">
+                            <div class="flex items-center">
+                                <img src={image_url} alt={asset_name} class="size-12 mr-4" />
+                                <div>
+                                    <h3 class="font-semibold">{asset_name}</h3>
+                                    <p class="text-gray-400">{format!("{} {units}", utxo.unblinded.value)}</p>
+                                    <button
+                                        onclick={soft_cancel_swap}
+                                        class="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                                        {"Soft Cancel"}
+                                    </button>
+                                    <button
+                                        onclick={hard_cancel_swap}
+                                        class="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
+                                        {"Hard Cancel"}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }).collect::<Html>()}
+                </div>
+            </div>
+    })
+}
+
 
 #[derive(Clone, Debug, PartialEq, Properties)]
 pub struct SwapNotificationProps {
