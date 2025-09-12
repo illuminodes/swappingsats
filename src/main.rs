@@ -1,4 +1,10 @@
-#![warn(clippy::all, clippy::pedantic, clippy::perf, clippy::nursery)]
+#![warn(
+    clippy::all,
+    clippy::pedantic,
+    clippy::perf,
+    clippy::nursery,
+    clippy::style
+)]
 #![allow(clippy::future_not_send)]
 
 pub mod components;
@@ -8,8 +14,8 @@ mod pages;
 pub mod persister;
 pub use persister::*;
 // mod quote_provider;
-mod router;
 mod contexts;
+mod router;
 pub use contexts::*;
 pub use pages::*;
 
@@ -33,41 +39,44 @@ fn app() -> Html {
     ];
     html! {
         <yew_router::BrowserRouter>
-            <Suspense fallback={html! {
-                <div class="w-screen h-screen bg-black flex items-center justify-center" >
-                    <img
-                    class={classes!("mb-4", "mx-auto", "size-48")}
-                    src="public/nostrtradeslogo.svg"
-                    alt="Nostrades Logo" />
-            </div>
-            }}>
-                <nostr_minions::NostrAppProvider {relays}>
+            <nostr_minions::NostrAppProvider {relays} fallback={html!{<SplashScreen />}}>
                 <LoginCheck>
                     <WalletProvider>
                     <OrderBookProvider>
                         <router::MainPages />
-                        <WalletLoad />
+                        // <WalletLoad />
                         <WalletSync />
                     </OrderBookProvider>
                     </WalletProvider>
                 </LoginCheck>
-                </nostr_minions::NostrAppProvider>
-            </Suspense>
+            </nostr_minions::NostrAppProvider>
         </yew_router::BrowserRouter>
     }
 }
 
+#[function_component(SplashScreen)]
+fn splash_screen() -> Html {
+    html! {
+        <div class="w-screen h-screen bg-black flex items-center justify-center" >
+            <img
+            class={classes!("mb-4", "mx-auto", "size-48")}
+            src="public/nostrtradeslogo.svg"
+            alt="Nostrades Logo" />
+        </div>
+    }
+}
+
 #[function_component(LoginCheck)]
-fn login_check(props: &yew::html::ChildrenProps) -> HtmlResult {
-    let key_ctx = nostr_minions::use_nostr_id_ctx();
-    if key_ctx.loaded() && key_ctx.get_pubkey().is_some() {
-        Ok(props.children.clone())
+fn login_check(props: &yew::html::ChildrenProps) -> Html {
+    let key_ctx = nostr_minions::use_nostr_key();
+    if key_ctx.is_some() {
+        props.children.clone()
     } else {
-        Ok(html! {
+        html! {
             <div class="flex flex-col items-center justify-evenly h-screen w-screen p-4">
                 <pages::NostrLogin />
             </div>
-        })
+        }
     }
 }
 
@@ -78,26 +87,23 @@ fn wallet_load() -> Html {
     let sync_handle = syncing.setter();
     let ctx_clone = ctx.clone();
     let sync_clone = sync_handle.clone();
-    use_effect_with((ctx.loaded(), ctx.synced()), move |(loaded, synced)| {
-        if *loaded && !*synced {
-            let sync_handle = sync_clone.clone();
-            yew::platform::spawn_local(async move {
-                // loop {
-                // sync_handle.set(true);
-                // // // web_sys::console::log_1(&"Syncing wallet...".into());
-                // if ctx_clone.simple_sync().await.is_ok() {
-                //     ctx_clone.dispatch(NostradeWalletAction::Synced);
-                //     web_sys::console::log_1(&"Wallet synced successfully".into());
-                // } else {
-                //       web_sys::console::error_1(&"Failed to sync wallet".into());
-                // }
-                // sync_handle.set(false);
-                //     gloo::timers::future::sleep(std::time::Duration::from_secs(180)).await;
-                // }
-            });
-        }
-        || ()
-    });
+    // use_effect_with((), move |()| {
+    //     let sync_handle = sync_clone.clone();
+    //     yew::platform::spawn_local(async move {
+    //         // loop {
+    //         sync_handle.set(true);
+    //         // // web_sys::console::log_1(&"Syncing wallet...".into());
+    //         if ctx_clone.full_sync().await.is_ok() {
+    //             ctx_clone.dispatch(NostradeWalletAction::Synced);
+    //             web_sys::console::log_1(&"Wallet synced successfully".into());
+    //         } else {
+    //             web_sys::console::error_1(&"Failed to sync wallet".into());
+    //         }
+    //         sync_handle.set(false);
+    //         //     gloo::timers::future::sleep(std::time::Duration::from_secs(180)).await;
+    //         // }
+    //     });
+    // });
     let icon = if *syncing {
         html! { <components::LoaderIcon size=5 class="animate-spin" /> }
     } else {

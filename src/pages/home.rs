@@ -59,17 +59,14 @@ fn main_options() -> HtmlResult {
                     <span class="text-xs">{"Receive"}</span>
                 </button>
             </yew_router::components::Link<crate::router::AppRoute>>
-            // <yew_router::components::Link<crate::router::AppRoute>
-            //     to={crate::router::AppRoute::Swap}>
+            <yew_router::components::Link<crate::router::AppRoute>
+                to={crate::router::AppRoute::Swap}>
                 <button
-                    onclick={Callback::from(move |_| {
-                        navigator.push(&crate::router::AppRoute::Swap);
-                    })}
                     class="flex justify-center items-center gap-2 p-3 flex-1">
                     <crate::components::ArrowUpDown class="size-5" />
                     <span class="text-xs">{"Swap"}</span>
                 </button>
-            // </yew_router::components::Link<crate::router::AppRoute>>
+            </yew_router::components::Link<crate::router::AppRoute>>
             <yew_router::components::Link<crate::router::AppRoute>
                 to={crate::router::AppRoute::SendCoins}>
                 <button class="flex justify-center items-center flex-1 gap-2 border-l border-gray-200 py-3 px-6">
@@ -84,7 +81,6 @@ fn main_options() -> HtmlResult {
 #[function_component(AssetList)]
 fn asset_list() -> HtmlResult {
     let balance = crate::use_wallet_balance()?;
-    web_sys::console::log_1(&format!("Balance: {:?}", balance).into());
     let liquid_balance = balance
         .iter()
         .find_map(|(k, v)| {
@@ -97,7 +93,6 @@ fn asset_list() -> HtmlResult {
     let usdt_balance = balance
         .iter()
         .find_map(|(k, v)| {
-            web_sys::console::log_1(&format!("Key: {:?}, Value: {}", k, v).into());
             (Ok(*k) == "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5".parse())
                 .then_some(v)
         })
@@ -108,7 +103,7 @@ fn asset_list() -> HtmlResult {
             <>
             // Accounts
             <div class="px-4">
-                
+
                 <h2 class="font-semibold mb-2">{"Spending Accounts"}</h2>
 
                 <div class="mb-2">

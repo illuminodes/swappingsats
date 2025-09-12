@@ -74,15 +74,12 @@ pub fn login_form() -> Html {
 }
 #[function_component(LoginForm)]
 pub fn new_key_form() -> Html {
-    let nostr_store = nostr_minions::use_idb_database();
-    let key_ctx = nostr_minions::use_nostr_id_ctx();
+    // let nostr_store = nostr_minions::use_idb_database();
+    let create_key_cb = nostr_minions::use_create_local_key();
     let mnemonic_submit = {
-        let key_ctx = key_ctx.dispatcher();
-        let nostr_store_clone = nostr_store.clone();
+        // let nostr_store_clone = nostr_store.clone();
+        let create_cb = create_key_cb.clone();
         Callback::from(move |form: web_sys::HtmlFormElement| {
-            let Some(nostr_store) = nostr_store_clone.clone() else {
-                return;
-            };
             let mut mnemonic = vec![];
             for i in 1..=24 {
                 let Some(word) = form
@@ -101,44 +98,12 @@ pub fn new_key_form() -> Html {
                 true,
             )
             .expect("Failed to create new key");
-            let key_ctx = key_ctx.clone();
-            yew::platform::spawn_local(async move {
-                let pubkey = new_key.public_key();
-                let Ok(identity) =
-                    nostr_minions::IdbKeypairEntry::from_keypair(new_key.clone()).await
-                else {
-                    return;
-                };
-                let Ok(transaction) = nostr_store.transaction(
-                    &[nostr_minions::NostrDbStoreName::UserIdentity.as_ref()],
-                    idb::TransactionMode::ReadWrite,
-                ) else {
-                    return;
-                };
-                let Ok(store) = transaction
-                    .object_store(nostr_minions::NostrDbStoreName::UserIdentity.as_ref())
-                else {
-                    return;
-                };
-                match store.put(&serde_wasm_bindgen::to_value(&identity).unwrap(), None) {
-                    Ok(_) => {
-                        key_ctx
-                            .dispatch(nostr_minions::NostrIdAction::LoadIdentity(pubkey, new_key));
-                    }
-                    Err(e) => {
-                        web_sys::console::error_1(&format!("{e:?}").into());
-                    }
-                }
-            });
+            create_cb.emit(new_key);
         })
     };
     let nsec_submit = {
-        let key_ctx = key_ctx.dispatcher();
-        let nostr_store_clone = nostr_store.clone();
+        let create_cb = create_key_cb.clone();
         Callback::from(move |form: web_sys::HtmlFormElement| {
-            let Some(nostr_store) = nostr_store_clone.clone() else {
-                return;
-            };
             let Some(input) = form
                 .get_with_name("hex-key")
                 .map(|input| input.unchecked_into::<web_sys::HtmlInputElement>().value())
@@ -154,35 +119,7 @@ pub fn new_key_form() -> Html {
                 return;
             };
             new_key.set_extractable(true);
-            let key_ctx = key_ctx.clone();
-            yew::platform::spawn_local(async move {
-                let pubkey = new_key.public_key();
-                let Ok(identity) =
-                    nostr_minions::IdbKeypairEntry::from_keypair(new_key.clone()).await
-                else {
-                    return;
-                };
-                let Ok(transaction) = nostr_store.transaction(
-                    &[nostr_minions::NostrDbStoreName::UserIdentity.as_ref()],
-                    idb::TransactionMode::ReadWrite,
-                ) else {
-                    return;
-                };
-                let Ok(store) = transaction
-                    .object_store(nostr_minions::NostrDbStoreName::UserIdentity.as_ref())
-                else {
-                    return;
-                };
-                match store.put(&serde_wasm_bindgen::to_value(&identity).unwrap(), None) {
-                    Ok(_) => {
-                        key_ctx
-                            .dispatch(nostr_minions::NostrIdAction::LoadIdentity(pubkey, new_key));
-                    }
-                    Err(e) => {
-                        web_sys::console::error_1(&format!("{e:?}").into());
-                    }
-                }
-            });
+            create_cb.emit(new_key);
         })
     };
     html! {
@@ -253,8 +190,7 @@ pub fn new_key_form() -> Html {
 }
 #[function_component(NewKeyForm)]
 pub fn new_key_form() -> Html {
-    let nostr_store = nostr_minions::use_idb_database();
-    let key_ctx = nostr_minions::use_nostr_id_ctx();
+    let create_key_cb = nostr_minions::use_create_local_key();
     let new_key =
         use_state(|| nostr_minions::nostro2_signer::keypair::NostrKeypair::generate(true));
     let mnemonic = new_key
@@ -262,40 +198,10 @@ pub fn new_key_form() -> Html {
         .unwrap_or_default();
     let hex_key = new_key.nsec().unwrap_or_default();
     let onclick = {
-        let keys = new_key.clone();
+        let cb_create_key = create_key_cb.clone();
+        let new_key = new_key.clone();
         Callback::from(move |_| {
-            let keys = keys.clone();
-            let Some(nostr_store) = nostr_store.clone() else {
-                return;
-            };
-            let key_ctx = key_ctx.dispatcher();
-            yew::platform::spawn_local(async move {
-                let pubkey = keys.public_key();
-                let Ok(identity) = nostr_minions::IdbKeypairEntry::from_keypair((*keys).clone()).await
-                else {
-                    return;
-                };
-                let Ok(transaction) = nostr_store.transaction(
-                    &[nostr_minions::NostrDbStoreName::UserIdentity.as_ref()],
-                    idb::TransactionMode::ReadWrite,
-                ) else {
-                    return;
-                };
-                let Ok(store) = transaction
-                    .object_store(nostr_minions::NostrDbStoreName::UserIdentity.as_ref())
-                else {
-                    return;
-                };
-                match store.put(&serde_wasm_bindgen::to_value(&identity).unwrap(), None) {
-                    Ok(_) => {
-                        key_ctx
-                            .dispatch(nostr_minions::NostrIdAction::LoadIdentity(pubkey, (*keys).clone()));
-                    }
-                    Err(e) => {
-                        web_sys::console::error_1(&format!("{e:?}").into());
-                    }
-                }
-            });
+            cb_create_key.emit((*new_key).clone());
         })
     };
     let copy_key = {
