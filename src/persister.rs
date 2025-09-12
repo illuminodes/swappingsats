@@ -46,7 +46,12 @@ impl IdbPersister {
 
         let mut store_params = idb::ObjectStoreParams::new();
         store_params.key_path(Some(idb::KeyPath::new_single(PROPOSAL_ID_KEY)));
-        db.create_object_store(OFFERS_STORE_NAME, store_params)?;
+        let store = db.create_object_store(OFFERS_STORE_NAME, store_params)?;
+        store.create_index(
+            "created_at",
+            idb::KeyPath::Single("offer.created_at".into()),
+            None,
+        )?;
 
         Ok(())
     }
@@ -103,7 +108,7 @@ impl IdbPersister {
             .transaction(&[PROPOSALS_STORE_NAME], idb::TransactionMode::ReadWrite)?;
         let store = tx.object_store(PROPOSALS_STORE_NAME)?;
         store
-            .add(&serde_wasm_bindgen::to_value(&proposal)?, None)?
+            .put(&serde_wasm_bindgen::to_value(&proposal)?, None)?
             .await?;
         tx.commit()?.await?;
         Ok(())
@@ -161,7 +166,7 @@ impl IdbPersister {
             .transaction(&[OFFERS_STORE_NAME], idb::TransactionMode::ReadWrite)?;
         let store = tx.object_store(OFFERS_STORE_NAME)?;
         store
-            .add(&serde_wasm_bindgen::to_value(&offer)?, None)?
+            .put(&serde_wasm_bindgen::to_value(&offer)?, None)?
             .await?;
         tx.commit()?.await?;
         Ok(())
@@ -181,6 +186,27 @@ impl IdbPersister {
                 offer.ok()
             })
             .collect())
+    }
+    pub async fn get_offers_in_last_hour(
+        &self,
+    ) -> Result<Vec<lwk_wollet::LiquidexProposal<lwk_wollet::Validated>>, PersistError> {
+        let tx = self
+            .db
+            .transaction(&[OFFERS_STORE_NAME], idb::TransactionMode::ReadOnly)?;
+        let store = tx.object_store(OFFERS_STORE_NAME)?;
+        let last_hour = (web_sys::js_sys::Date::now() / 1000.0) - 3600.0;
+        let key_range = idb::KeyRange::lower_bound(&wasm_bindgen::JsValue::from(last_hour), None)?;
+        let index = store.index("created_at")?;
+        let proposals = index
+            .get_all(Some(idb::Query::KeyRange(key_range)), None)?
+            .await?
+            .into_iter()
+            .filter_map(|value| {
+                let idb_offer: Result<PersistedOffer, _> = serde_wasm_bindgen::from_value(value);
+                idb_offer.ok()?.offer().ok()?.insecure_validate().ok()
+            })
+            .collect::<Vec<_>>();
+        Ok(proposals)
     }
 }
 
@@ -217,18 +243,24 @@ pub struct PersistedOffer {
     pub offer: nostr_minions::nostro2::NostrNote,
 }
 impl PersistedOffer {
-    pub fn new(
-        offer: nostr_minions::nostro2::NostrNote,
-    ) -> Result<Self, PersistError> {
+    pub fn new(offer: nostr_minions::nostro2::NostrNote) -> Result<Self, PersistError> {
         let tx_id = offer
             .tags
             .first_parameter()
             .ok_or(PersistError::NoUtxoId)?
             .parse()?;
-        Ok(Self {
-            tx_id,
-            offer,
-        })
+        Ok(Self { tx_id, offer })
+    }
+    pub fn tx_id(&self) -> elements::Txid {
+        self.tx_id
+    }
+    pub fn offer_note(&self) -> &nostr_minions::nostro2::NostrNote {
+        &self.offer
+    }
+    pub fn offer(
+        &self,
+    ) -> Result<lwk_wollet::LiquidexProposal<lwk_wollet::Unvalidated>, PersistError> {
+        Ok(self.offer.content.parse()?)
     }
 }
 

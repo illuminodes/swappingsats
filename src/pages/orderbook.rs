@@ -1,22 +1,8 @@
 use yew::prelude::*;
 
-use crate::ESPLORA_CLIENT;
 static MEMPOOL_CLIENT: std::sync::LazyLock<reqwest::Client> =
     std::sync::LazyLock::new(reqwest::Client::new);
 
-pub async fn is_tx_spent(tx_id: elements::Txid, vout: u32) -> bool {
-    let txid = tx_id.to_string();
-    web_sys::console::log_1(&format!("Checking tx: {tx_id}").into());
-    let txs = MEMPOOL_CLIENT
-        .get(format!(
-            "https://liquid.network/api/tx/{txid}/outspend/{vout}"
-        ))
-        .send()
-        .await
-        .expect("Failed to get tx spend");
-    let spent: crate::SpentResponse = txs.json().await.expect("Failed to parse tx spend");
-    spent.spent
-}
 
 #[function_component(OrderBookScreen)]
 pub fn order_book_screen() -> HtmlResult {
@@ -25,53 +11,11 @@ pub fn order_book_screen() -> HtmlResult {
         return Ok(html! {});
     };
     let offers = yew::suspense::use_future_with((), |_| async move {
-        let Ok(orders) = persistor.get_all_offers().await else {
+        let orders = persistor.get_offers_in_last_hour().await;
+        let Ok(orders) = orders else {
             return vec![];
         };
-        let parsed_offers = orders
-            .iter()
-            .filter_map(|offer| {
-                offer
-                    .offer
-                    .content
-                    .parse::<lwk_wollet::LiquidexProposal<lwk_wollet::Unvalidated>>()
-                    .ok()
-            })
-            .collect::<Vec<_>>();
-       let needed_txs = parsed_offers
-           .iter()
-           .filter_map(|proposal| proposal.needed_tx().ok())
-           .collect::<Vec<_>>();
-        let mut valid_txs = vec![];
-        for tx in needed_txs {
-            if !is_tx_spent(tx, 0).await {
-                valid_txs.push(tx);
-            }
-        }
-        web_sys::console::log_1(&format!("Valid TXs: {valid_txs:?}").into());
-       //  let Ok(txs) = ESPLORA_CLIENT
-       //      .write()
-       //      .await
-       //      .get_transactions(&needed_txs)
-       //      .await
-       //  else {
-       //      return vec![];
-       //  };
-        let mut validated_orders = vec![];
-        for offer in parsed_offers {
-            // let needed_tx = offer.needed_tx().unwrap();
-            // let Some(tx) = txs.iter().find(|tx| tx.txid() == needed_tx) else {
-            //     continue;
-            // };
-            let Ok(validated) = offer.insecure_validate() else {
-                continue;
-            };
-            // let Ok(validated) = offer.validate(tx.clone()) else {
-            //     continue;
-            // };
-            validated_orders.push(validated);
-        }
-        validated_orders
+        orders
     })?;
 
     let onclick = Callback::from(move |proposal: lwk_wollet::LiquidexProposal<lwk_wollet::Validated>| {
