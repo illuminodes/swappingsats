@@ -5,7 +5,7 @@ use yew::prelude::*;
 
 #[function_component(SendCoinsScreen)]
 pub fn send_coins_screen() -> HtmlResult {
-    let selected_asset = use_state(|| None::<SupportedAsset>);
+    let selected_asset = use_state(|| None::<elements::AssetId>);
     let go_back_button = {
         let asset_handle = selected_asset.clone();
         if asset_handle.is_some() {
@@ -56,25 +56,22 @@ pub fn send_coins_screen() -> HtmlResult {
 
 #[function_component(SendCoinForm)]
 fn send_coin_form(props: &AssetTilesProps) -> Html {
-    let wallet_ctx = use_context::<crate::NostradeWalletStore>()
-        .expect("No wallet context found");
-
-    let (asset_img, asset_name) = match *props.asset_handle {
-        Some(SupportedAsset::Bitcoin) => (
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/1200px-Bitcoin.svg.png",
-            "Bitcoin",
-        ),
-        Some(SupportedAsset::LiquidBitcoin) => (
-            "https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png",
-            "Liquid Bitcoin",
-        ),
-        Some(SupportedAsset::Tether) => ("https://tether.to/images/logoCircle.png", "Tether"),
-        None => ("", "Unknown Asset"),
-    };
+    let send_coins_cb = crate::use_send_coins();
+    let (asset_img, asset_name) = 
+        props.asset_handle.map_or(("", "Unknown Asset"), |asset_id| if asset_id == *crate::T_L_BTC_ASSET_ID {
+            (
+                "https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png",
+                "Liquid Bitcoin",
+            )
+        } else if asset_id == *crate::T_USDT_ASSET_ID {
+            ("https://tether.to/images/logoCircle.png", "Tether")
+        } else {
+            ("", "Unknown Asset")
+        }
+    );
     let address = use_state(|| None::<bool>);
     let onsubmit = {
         let asset_handle = props.asset_handle.clone();
-        let wallet_ctx = wallet_ctx.clone();
         let address = address.clone();
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
@@ -102,45 +99,8 @@ fn send_coin_form(props: &AssetTilesProps) -> Html {
                 web_sys::console::error_1(&"Recipient address or asset amount is invalid".into());
                 return;
             }
-            if let Some(asset_id) = (*asset_handle).clone() {
-                let address_clone = elements_address.clone();
-                let wallet_ctx = wallet_ctx.clone();
-                yew::platform::spawn_local(async move {
-                    match asset_id {
-                        SupportedAsset::Bitcoin => {
-                            web_sys::console::log_1(
-                                &format!("Sending {} BTC to {}", asset_amount, address_clone)
-                                    .into(),
-                            );
-                        }
-                        SupportedAsset::LiquidBitcoin => {
-                            let asset_id = elements::AssetId::from_str(
-                                "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49",
-                            )
-                            .unwrap();
-                            let future =
-                                wallet_ctx.send_coins(&address_clone, asset_amount, asset_id);
-                            if let Err(e) = future.await {
-                                web_sys::console::error_1(
-                                    &format!("Failed to send coins: {e:?}").into(),
-                                );
-                            }
-                        }
-                        SupportedAsset::Tether => {
-                            let asset_id = elements::AssetId::from_str(
-                                "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5",
-                            )
-                            .unwrap();
-                            let future =
-                                wallet_ctx.send_coins(&address_clone, asset_amount, asset_id);
-                            if let Err(e) = future.await {
-                                web_sys::console::error_1(
-                                    &format!("Failed to send coins: {e:?}").into(),
-                                );
-                            }
-                        }
-                    }
-                });
+            if let Some(asset_id) = *asset_handle {
+                send_coins_cb.emit((elements_address, asset_amount, asset_id));
             }
         })
     };
@@ -205,16 +165,10 @@ fn send_coin_form(props: &AssetTilesProps) -> Html {
         </form>
     )
 }
-#[derive(Clone, PartialEq)]
-enum SupportedAsset {
-    Bitcoin,
-    LiquidBitcoin,
-    Tether,
-}
 
 #[derive(Properties, Clone, PartialEq)]
 struct AssetTilesProps {
-    pub asset_handle: UseStateHandle<Option<SupportedAsset>>,
+    pub asset_handle: UseStateHandle<Option<elements::AssetId>>,
 }
 
 #[function_component(AssetTiles)]
@@ -222,7 +176,7 @@ fn asset_tiles(props: &AssetTilesProps) -> Html {
     let selected_asset = props.asset_handle.clone();
     let onclick = {
         let selected_asset = selected_asset.clone();
-        Callback::from(move |asset: SupportedAsset| {
+        Callback::from(move |asset: elements::AssetId| {
             selected_asset.set(Some(asset));
         })
     };
@@ -231,18 +185,7 @@ fn asset_tiles(props: &AssetTilesProps) -> Html {
             // Example asset tiles
             <div
                 onclick={
-                    onclick.reform(|_| SupportedAsset::Bitcoin)
-                }
-                class="aspect-square gap-2 border border-gray-200 shadow-xl p-4 rounded-xl">
-                <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/1200px-Bitcoin.svg.png"
-                    class="size-14 my-2" />
-                <h3 class="font-semibold">{"Bitcoin"}</h3>
-                <p class="text-sm text-gray-400">{"BTC"}</p>
-            </div>
-            <div
-                onclick={
-                    onclick.reform(|_| SupportedAsset::LiquidBitcoin)
+                    onclick.reform(|_| *crate::T_L_BTC_ASSET_ID)
                 }
                 class="aspect-square gap-2 border border-gray-200 shadow-xl p-4 rounded-xl">
                 <img
@@ -253,7 +196,7 @@ fn asset_tiles(props: &AssetTilesProps) -> Html {
             </div>
             <div
                 onclick={
-                    onclick.reform(|_| SupportedAsset::Tether)
+                    onclick.reform(|_| *crate::T_USDT_ASSET_ID)
                 }
                 class="aspect-square gap-2 border border-gray-200 shadow-xl p-4 rounded-xl">
                 <img src="https://tether.to/images/logoCircle.png" class="size-14 my-2" />

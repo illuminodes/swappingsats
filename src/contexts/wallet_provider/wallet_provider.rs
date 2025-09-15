@@ -15,24 +15,6 @@ pub static ESPLORA_CLIENT: std::sync::LazyLock<
     .into()
 });
 
-#[derive(Debug, thiserror::Error)]
-pub enum NostradeWalletError {
-    #[error("LWK error: {0}")]
-    Lwk(#[from] lwk_wollet::Error),
-    #[error("LWK sign error: {0}")]
-    LwkSign(#[from] lwk_signer::SignError),
-    #[error("LWK persist error: {0}")]
-    LwkPersist(#[from] lwk_wollet::PersistError),
-    #[error("Persist error: {0}")]
-    Persist(#[from] crate::persister::PersistError),
-    #[error("No IDB")]
-    NoPersister,
-    #[error("No UTXO found")]
-    NoUtxo,
-    #[error("No proposal found")]
-    Pset(#[from] elements::pset::Error),
-}
-
 #[derive(Clone, Debug)]
 pub struct NostradeWallet {
     synced: u64,
@@ -75,15 +57,6 @@ impl NostradeWallet {
         persistor.push_update(update.clone()).await?;
         Ok(wollet.apply_update_no_persist(update)?)
     }
-    pub async fn balance(
-        &self,
-    ) -> Result<std::collections::BTreeMap<elements::AssetId, u64>, NostradeWalletError> {
-        Ok(self.wollet.read().await.balance()?)
-    }
-    pub async fn address(&self) -> Result<elements::Address, NostradeWalletError> {
-        let wollet = self.wollet.read().await;
-        Ok(wollet.address(None).map(|addr| addr.address().clone())?)
-    }
     pub async fn available_utxos(
         &self,
     ) -> Result<Vec<lwk_wollet::WalletTxOut>, NostradeWalletError> {
@@ -119,37 +92,6 @@ impl NostradeWallet {
     pub async fn transactions(&self) -> Result<Vec<lwk_wollet::WalletTx>, NostradeWalletError> {
         let wollet = self.wollet.read().await;
         Ok(wollet.transactions()?)
-    }
-
-    pub async fn send_coins(
-        &self,
-        recipient: &elements::Address,
-        amount: u64,
-        asset_id: elements::AssetId,
-    ) -> Result<elements::Txid, NostradeWalletError> {
-        let available_utxos = self
-            .available_utxos()
-            .await?
-            .iter()
-            .map(|utxo| utxo.outpoint)
-            .collect::<Vec<_>>();
-        let wollet = self.wollet.write().await;
-        let mut pset = wollet
-            .tx_builder()
-            .set_wallet_utxos(available_utxos)
-            .add_recipient(recipient, amount, asset_id)?
-            .fee_rate(Some(100.)) // Adjust fee rate as needed
-            .finish()?;
-        lwk_common::Signer::sign(&self.signer, &mut pset)?;
-        let tx = wollet.finalize(&mut pset)?;
-        let tx_id = ESPLORA_CLIENT.write().await.broadcast(&tx).await?;
-        let updates = wollet.updates()?;
-
-        let Some(persistor) = &self.persistor else {
-            return Err(NostradeWalletError::NoPersister);
-        };
-        drop(wollet);
-        Ok(tx_id)
     }
 
     pub async fn liquidex_proposal(

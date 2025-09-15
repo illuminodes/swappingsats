@@ -11,8 +11,6 @@ pub mod components;
 
 use yew::prelude::*;
 mod pages;
-pub mod persister;
-pub use persister::*;
 // mod quote_provider;
 mod contexts;
 mod router;
@@ -41,6 +39,7 @@ fn app() -> Html {
         <yew_router::BrowserRouter>
             <nostr_minions::NostrAppProvider {relays} fallback={html!{<SplashScreen />}}>
                 <LoginCheck>
+                <NostradesDbProvider>
                     <WalletProvider>
                     <OrderBookProvider>
                         <router::MainPages />
@@ -48,6 +47,7 @@ fn app() -> Html {
                         <WalletSync />
                     </OrderBookProvider>
                     </WalletProvider>
+                    </NostradesDbProvider>
                 </LoginCheck>
             </nostr_minions::NostrAppProvider>
         </yew_router::BrowserRouter>
@@ -83,17 +83,19 @@ fn login_check(props: &yew::html::ChildrenProps) -> Html {
 #[function_component(WalletSync)]
 fn wallet_load() -> Html {
     let ctx = use_context::<NostradeWalletStore>().expect("No wallet context found");
+    let nostrades_db = crate::use_nostrades_db();
     let syncing = use_state(|| false);
     let sync_handle = syncing.setter();
     let ctx_clone = ctx.clone();
     let sync_clone = sync_handle.clone();
+    let db = nostrades_db.clone();
     use_effect_with((), move |()| {
         let sync_handle = sync_clone.clone();
         yew::platform::spawn_local(async move {
             // loop {
             sync_handle.set(true);
             // // web_sys::console::log_1(&"Syncing wallet...".into());
-            if ctx_clone.full_sync().await.is_ok() {
+            if ctx_clone.update_wallet(&db).await.is_ok() {
                 ctx_clone.dispatch(NostradeWalletAction::Synced);
                 web_sys::console::log_1(&"Wallet synced successfully".into());
             } else {
@@ -113,13 +115,15 @@ fn wallet_load() -> Html {
         <div
             onclick={
                 let sync_handle = sync_handle.clone();
+                let db = nostrades_db.clone();
                 Callback::from(move |_| {
                 web_sys::console::log_1(&"Wallet sync clicked".into());
                 let sync_handle = sync_handle.clone();
                 let ctx = ctx.clone();
+                let trades_db = db.clone();
                 yew::platform::spawn_local(async move {
                     sync_handle.set(true);
-                    if ctx.full_sync().await.is_ok() {
+                    if ctx.update_wallet(&trades_db).await.is_ok() {
                         ctx.dispatch(NostradeWalletAction::Synced);
                         web_sys::console::log_1(&"Wallet synced successfully".into());
                     } else {
@@ -134,35 +138,16 @@ fn wallet_load() -> Html {
     }
 }
 
-static ILLUMINODES_ADDRESS: std::sync::LazyLock<elements::Address> = std::sync::LazyLock::new(
-    || {
-        "tlq1qqv8caryh8kdy6v3mgn6cljngks9geedrcdsxa8eav5l2p8hmcz3kedv082nkdurnjta8rrt2wjlhgk86mlhk5r2tjt0hkp4ty"
-            .parse::<elements::Address>()
-            .expect("Failed to parse address")
-    },
-);
+pub static T_L_BTC_ASSET_ID: std::sync::LazyLock<elements::AssetId> =
+    std::sync::LazyLock::new(|| {
+        "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49"
+            .parse::<elements::AssetId>()
+            .expect("Failed to parse asset id")
+    });
 
-static T_L_BTC_ASSET_ID: std::sync::LazyLock<elements::AssetId> = std::sync::LazyLock::new(|| {
-    "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49"
-        .parse::<elements::AssetId>()
-        .expect("Failed to parse asset id")
-});
-
-static T_USDT_ASSET_ID: std::sync::LazyLock<elements::AssetId> = std::sync::LazyLock::new(|| {
-    "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5"
-        .parse::<elements::AssetId>()
-        .expect("Failed to parse asset id")
-});
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn test_illuminodes_address() {
-        let address = crate::ILLUMINODES_ADDRESS.clone();
-        assert_eq!(
-            address.to_string(),
-            "tlq1qqv8caryh8kdy6v3mgn6cljngks9geedrcdsxa8eav5l2p8hmcz3kedv082nkdurnjta8rrt2wjlhgk86mlhk5r2tjt0hkp4ty"
-        );
-    }
-}
+pub static T_USDT_ASSET_ID: std::sync::LazyLock<elements::AssetId> =
+    std::sync::LazyLock::new(|| {
+        "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5"
+            .parse::<elements::AssetId>()
+            .expect("Failed to parse asset id")
+    });
