@@ -36,6 +36,10 @@ pub fn dashboard_screen() -> HtmlResult {
                 <MainOptions />
 
             </div>
+            <div class="px-4">
+
+                <h2 class="font-semibold mb-2">{"Spending Accounts"}</h2>
+
             <Suspense fallback={html! {
                 <div class="w-full items-center justify-center flex p-4">
                     <crate::components::LoaderIcon size=8 class="animate-spin text-gray-500" />
@@ -43,6 +47,19 @@ pub fn dashboard_screen() -> HtmlResult {
             }}>
                 <AssetList />
             </Suspense>
+            </div>
+            <div class="px-4">
+            <h3 class="font-semibold">{"My Orders"}</h3>
+            <Suspense fallback={html! {
+                <div class="w-full items-center justify-center flex p-4">
+                    <crate::components::LoaderIcon size=8 class="animate-spin text-gray-500" />
+                </div>
+            }}>
+                
+                <MyOrders />
+            </Suspense>
+            </div>
+
         </>
     })
 }
@@ -102,10 +119,6 @@ fn asset_list() -> HtmlResult {
     Ok(html! {
             <>
             // Accounts
-            <div class="px-4">
-
-                <h2 class="font-semibold mb-2">{"Spending Accounts"}</h2>
-
                 <div class="mb-2">
                     <div class="p-4 shadow-xl rounded-2xl border border-gray-200">
                         <div class="flex items-center justify-between">
@@ -145,8 +158,61 @@ fn asset_list() -> HtmlResult {
                         </div>
                     </div>
                 </div>
-            </div>
         </>
 
+    })
+}
+
+#[function_component(MyOrders)]
+fn my_orders() -> HtmlResult {
+    let orders = crate::use_orderbook_ctx();
+    let db_ctx = crate::use_nostrades_db();
+    let orders = yew::suspense::use_future_with(orders, move |orderbook| async move {
+        let offers = orderbook.my_offers().await?;
+        let filtered = db_ctx.get_all_swaps().await?;
+        let filtered_offers = offers
+            .into_iter()
+            .filter(|(note, _)| {
+                let Some(offer_id) = note.id.as_ref() else {
+                    return false;
+                };
+                !filtered.iter().any(|swap| &swap.id == offer_id)
+            })
+            .collect::<Vec<_>>();
+        Ok::<_, crate::OrderScreenError>(filtered_offers)
+    })?;
+    let Ok(orders) = orders.as_ref() else {
+        return Ok(html! {
+            <div class="p-4">
+                <p class="text-gray-500">{"Error loading orderbook."}</p>
+            </div>
+        });
+    };
+    Ok(html! {
+        <div class="p-4 flex flex-col gap-4 min-h-screen">
+            {orders.iter().map(|(note, offer)| {
+                let input ={ match offer.input().asset.to_string().as_str() {
+                    "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => "L-BTC",
+                    "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => "USDT",
+                    _ => "Unknown Asset",
+                }};
+                let input_amount = offer.input().amount;
+                let output_asset = match offer.output().asset.to_string().as_str() {
+                    "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => "L-BTC",
+                    "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => "USDT",
+                    _ => "Unknown Asset",
+                };
+                let output_amount = offer.output().amount;
+                html! {
+                    <div class="flex flex-row justify-between items-center p-4 border border-gray-200 shadow-lg rounded-xl">
+                        <div class="flex flex-col gap-2">
+                            <h4 class="font-semibold">{format!("{input} {input_amount}")}</h4>
+                            <p class="text-gray-500">{"Swap for"}</p>
+                            <h4 class="font-semibold">{format!("{output_asset} {output_amount}")}</h4>
+                        </div>
+                    </div>
+                }
+            }).collect::<Html>()}
+        </div>
     })
 }

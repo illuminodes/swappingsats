@@ -7,11 +7,19 @@ pub struct SwapCoinsScreenProps {
 
 #[function_component(SwapTesting)]
 pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
-    let utxo_to_swap = props.utxo_to_swap.clone();
-    let wallet_ctx = use_context::<crate::NostradeWalletStore>()
-        .expect("No wallet context found");
+    let wallet_ctx = crate::use_wallet_ctx();
     let nostr_key = nostr_minions::use_nostr_key();
     let relay_ctx = nostr_minions::use_nostr_relay_pool();
+    let db_ctx = crate::use_nostrades_db();
+    let Some(utxo_to_swap) = props.utxo_to_swap.as_ref().cloned() else {
+        return Ok(html! {
+            <div class="p-4">
+                <p class="text-gray-500">{"No UTXO selected for swap."}</p>
+            </div>
+        });
+    };
+
+    let utxo = utxo_to_swap.clone();
     let onclick = {
         Callback::from(move |form_event: SubmitEvent| {
             form_event.prevent_default();
@@ -26,59 +34,44 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
             let Some(nostr_key) = nostr_key.clone() else {
                 return;
             };
-            let Some(utxo) = utxo_to_swap.as_ref().cloned() else {
-                return;
-            };
             let wallet = wallet_ctx.clone();
             let relay = relay_ctx.clone();
+            let db = db_ctx.clone();
 
-            let asset_id = match utxo.unblinded.asset.to_string().as_str() {
-                "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => {
-                    "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5"
-                }
-                "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => {
-                    "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49"
-                }
-                _ => "Unknown Asset",
-            }
-            .parse::<elements::AssetId>()
-            .expect("Failed to parse asset id");
+            let swap_asset_id = if utxo.unblinded.asset == *crate::T_L_BTC_ASSET_ID {
+                *crate::T_USDT_ASSET_ID
+            } else if utxo.unblinded.asset == *crate::T_USDT_ASSET_ID {
+                *crate::T_L_BTC_ASSET_ID
+            } else {
+                return;
+            };
+
             yew::platform::spawn_local(async move {
-                let Some(persistor) = wallet.persistor() else {
-                    return;
-                };
-                let address = wallet.address().await.expect("Failed to get address");
                 let proposal = wallet
-                    .liquidex_proposal(utxo.outpoint, &address, swap_amount, asset_id)
+                    .create_swap_offer(utxo.outpoint, swap_amount, swap_asset_id, &db)
                     .await
-                    .expect("Failed to create proposal");
+                    .unwrap();
                 let mut proposal_note = nostr_minions::nostro2::NostrNote {
                     content: serde_json::to_string(&proposal).unwrap(),
                     kind: 32121,
                     ..Default::default()
                 };
-                proposal_note
-                    .tags
-                    .add_parameter_tag(proposal.needed_tx().unwrap().to_string().as_str());
+                proposal_note.tags.add_parameter_tag(
+                    format!("{}:{}", utxo.outpoint.txid, utxo.outpoint.vout).as_str(),
+                );
                 nostr_key
                     .sign_note(&mut proposal_note)
                     .expect("Failed to sign note");
-                let persisted_proposal =
-                    crate::persister::PersistedProposal::new(proposal_note.clone())
-                        .expect("Failed to create persisted proposal");
-                if let Err(e) = persistor.push_proposal(persisted_proposal).await {
-                    web_sys::console::error_1(&format!("Failed to persist proposal: {e}").into());
-                }
-                // TODO: SEND TO NOSTR
-                // TODO: SAVE PROPOSAL TO LOCAL STORAGE
                 let _ = relay.send(proposal_note);
             });
         })
     };
 
     Ok(html! {
-        <form onsubmit={onclick}>
-            <input type="number" min="0" step="1000" name="input_amount" placeholder="Input Amount" />
+        <form
+            class="flex flex-col items-center gap-4 justify-evenly px-6"
+            onsubmit={onclick}>
+            <input disabled={true} type="number" min="0" step="1000" name="input_amount" placeholder="Input Amount" value={utxo_to_swap.unblinded.value.to_string()} />
             <input type="number" min="0" step="1" name="swap_amount" placeholder="Swap Amount" />
 
             <input type="submit" value="Submit" />
@@ -150,8 +143,7 @@ pub fn swap_coins_screen() -> HtmlResult {
 
 #[function_component(UtxoToSwap)]
 pub fn utxo_to_swap(props: &SwapCoinsScreenProps) -> HtmlResult {
-    let wallet_ctx = use_context::<crate::NostradeWalletStore>()
-        .expect("No wallet context found");
+    let wallet_ctx = use_context::<crate::NostradeWalletStore>().expect("No wallet context found");
     let waiting_for_swap = use_state(|| None::<String>);
     let nostr_key = nostr_minions::use_nostr_key();
     let relay_ctx = nostr_minions::use_nostr_relay_pool();
@@ -264,10 +256,9 @@ pub fn locked_utxos(props: &SwapCoinsScreenProps) -> HtmlResult {
                             utxo_to_swap.set(Some(utxo.clone()));
                         })
                     };
-                    let tx_id = utxo.outpoint.txid;
-                    let utxo_clone = utxo.clone();
+                    let tx_id = utxo.outpoint;
                     let soft_cancel_swap = soft_cancel_swap.clone().reform(move |_| tx_id);
-                    let hard_cancel_swap = hard_cancel_swap.clone().reform(move |_| utxo_clone.clone());
+                    let hard_cancel_swap = hard_cancel_swap.clone().reform(move |_| tx_id);
 
                     html! {
                         <div {onclick} class="p-4 mb-2 border border-gray-200 rounded-lg shadow-sm max-w-xs snap-start">
@@ -295,7 +286,6 @@ pub fn locked_utxos(props: &SwapCoinsScreenProps) -> HtmlResult {
             </div>
     })
 }
-
 
 #[derive(Clone, Debug, PartialEq, Properties)]
 pub struct SwapNotificationProps {
