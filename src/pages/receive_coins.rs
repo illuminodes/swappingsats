@@ -1,5 +1,5 @@
-use yew_bitcoin_qr::BitcoinQrCode;
 use yew::prelude::*;
+use yew_bitcoin_qr::BitcoinQrCode;
 
 #[function_component(ReceiveCoinsScreen)]
 pub fn receive_coins_screen() -> Html {
@@ -55,14 +55,14 @@ pub fn receive_coins_screen() -> Html {
 }
 
 #[function_component(ReceiveLiquidCoins)]
-fn receive_liquid_coins() -> HtmlResult {
+fn receive_liquid_coins() -> Html {
     let copied = use_state(|| false);
     let Some(address) = crate::use_wallet_address() else {
-        return Ok(html! {
+        return html! {
             <div class="p-4">
                 <p class="text-red-500">{"Failed to load wallet address."}</p>
             </div>
-        });
+        };
     };
     let onclick = {
         let copied = copied.setter();
@@ -91,7 +91,7 @@ fn receive_liquid_coins() -> HtmlResult {
         }
     };
 
-    Ok(html! {
+    html! {
           <div class="p-6">
               <div class="text-center mb-8">
                   <h2>
@@ -139,7 +139,7 @@ fn receive_liquid_coins() -> HtmlResult {
                   </button>
               </div>
           </div>
-    })
+    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -157,7 +157,7 @@ struct AssetTilesProps {
 fn asset_tiles(props: &AssetTilesProps) -> Html {
     let selected_asset = props.asset_handle.clone();
     let onclick = {
-        let selected_asset = selected_asset.clone();
+        let selected_asset = selected_asset;
         Callback::from(move |asset: SupportedAsset| {
             selected_asset.set(Some(asset));
         })

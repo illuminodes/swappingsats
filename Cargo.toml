@@ -3,6 +3,7 @@ name = "swappingsats"
 version = "0.1.0"
 edition = "2024"
 
+
 [dependencies]
 idb = { version = "0.6.4" }
 gloo = { version = "0.11.0", features = ["timers"] }
@@ -28,7 +29,8 @@ serde-wasm-bindgen = "0.6.5"
 
 nostr-minions = { version = "0.1.23" }
 # nostr-minions = { path = "../../minions" }
-shady-minions = { path = "./shady-minions" }
+# shady-minions = { path = "./shady-minions" }
+shady-minions = { version = "0.1.1" }
 
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 wasm-bindgen-futures = "0.4.50"

@@ -3,9 +3,16 @@ use std::str::FromStr;
 use wasm_bindgen::JsCast;
 use yew::prelude::*;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SupportedAsset {
+    Bitcoin,
+    LiquidBitcoin,
+    Tether,
+}
+
 #[function_component(SendCoinsScreen)]
-pub fn send_coins_screen() -> HtmlResult {
-    let selected_asset = use_state(|| None::<elements::AssetId>);
+pub fn send_coins_screen() -> Html {
+    let selected_asset = use_state(|| None::<SupportedAsset>);
     let go_back_button = {
         let asset_handle = selected_asset.clone();
         if asset_handle.is_some() {
@@ -32,7 +39,7 @@ pub fn send_coins_screen() -> HtmlResult {
         }
     };
 
-    Ok(html!(
+    html!(
         <>
             // Header
             <div class="p-4 flex items-center w-full justify-between">
@@ -51,28 +58,36 @@ pub fn send_coins_screen() -> HtmlResult {
                 }}
             </div>
         </>
-    ))
+    )
+}
+
+#[derive(Properties, Clone, PartialEq)]
+struct AssetTilesProps {
+    pub asset_handle: UseStateHandle<Option<SupportedAsset>>,
 }
 
 #[function_component(SendCoinForm)]
 fn send_coin_form(props: &AssetTilesProps) -> Html {
+    // Usa el hook existente que ya maneja el envío de coins
     let send_coins_cb = crate::use_send_coins();
-    let (asset_img, asset_name) = 
-        props.asset_handle.map_or(("", "Unknown Asset"), |asset_id| if asset_id == *crate::T_L_BTC_ASSET_ID {
-            (
-                "https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png",
-                "Liquid Bitcoin",
-            )
-        } else if asset_id == *crate::T_USDT_ASSET_ID {
-            ("https://tether.to/images/logoCircle.png", "Tether")
-        } else {
-            ("", "Unknown Asset")
-        }
-    );
+
+    let (asset_img, asset_name) = match *props.asset_handle {
+        Some(SupportedAsset::Bitcoin) => (
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/1200px-Bitcoin.svg.png",
+            "Bitcoin",
+        ),
+        Some(SupportedAsset::LiquidBitcoin) => (
+            "https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png",
+            "Liquid Bitcoin",
+        ),
+        Some(SupportedAsset::Tether) => ("https://tether.to/images/logoCircle.png", "Tether"),
+        None => ("", "Unknown Asset"),
+    };
     let address = use_state(|| None::<bool>);
     let onsubmit = {
         let asset_handle = props.asset_handle.clone();
         let address = address.clone();
+        let send_coins_cb = send_coins_cb;
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
             if address.is_none() || address.is_some_and(|addr| !addr) {
@@ -99,24 +114,25 @@ fn send_coin_form(props: &AssetTilesProps) -> Html {
                 web_sys::console::error_1(&"Recipient address or asset amount is invalid".into());
                 return;
             }
-            if let Some(asset_id) = *asset_handle {
-                send_coins_cb.emit((elements_address, asset_amount, asset_id));
+            if let Some(asset_id) = (*asset_handle).clone() {
+                match asset_id {
+                    SupportedAsset::Bitcoin => {
+                        web_sys::console::log_1(
+                            &format!("Sending {asset_amount} BTC to {elements_address}").into(),
+                        );
+                    }
+                    SupportedAsset::LiquidBitcoin => {
+                        let asset_id = *crate::T_L_BTC_ASSET_ID;
+                        send_coins_cb.emit((elements_address, asset_amount, asset_id));
+                    }
+                    SupportedAsset::Tether => {
+                        let asset_id = *crate::T_USDT_ASSET_ID;
+                        send_coins_cb.emit((elements_address, asset_amount, asset_id));
+                    }
+                }
             }
         })
     };
-    let address_checked = classes!(
-        "absolute",
-        "right-6",
-        "top-1/2",
-        "-translate-y-3",
-        "size-6",
-        if address.is_some_and(|addr| addr) {
-            "text-green-500"
-        } else {
-            "text-red-400"
-        },
-        if address.is_none() { "hidden" } else { "" }
-    );
 
     html!(
         <form {onsubmit}
@@ -141,13 +157,7 @@ fn send_coin_form(props: &AssetTilesProps) -> Html {
                     class="absolute inset-0 p-2 border border-gray-200 rounded-lg max-w-64 truncate"
                     required=true />
                 {match *address {
-                    Some(true) => html!(
-                        // <lucide_yew::Check class={address_checked} />
-                    ),
-                    Some(false) => html!(
-                        // <lucide_yew::X class={address_checked} />
-                    ),
-                    None => html!(),
+                    Some(false | true) | None => html!(),
                 }}
             </div>
             <input
@@ -166,17 +176,12 @@ fn send_coin_form(props: &AssetTilesProps) -> Html {
     )
 }
 
-#[derive(Properties, Clone, PartialEq)]
-struct AssetTilesProps {
-    pub asset_handle: UseStateHandle<Option<elements::AssetId>>,
-}
-
 #[function_component(AssetTiles)]
 fn asset_tiles(props: &AssetTilesProps) -> Html {
     let selected_asset = props.asset_handle.clone();
     let onclick = {
-        let selected_asset = selected_asset.clone();
-        Callback::from(move |asset: elements::AssetId| {
+        let selected_asset = selected_asset;
+        Callback::from(move |asset: SupportedAsset| {
             selected_asset.set(Some(asset));
         })
     };
@@ -185,7 +190,7 @@ fn asset_tiles(props: &AssetTilesProps) -> Html {
             // Example asset tiles
             <div
                 onclick={
-                    onclick.reform(|_| *crate::T_L_BTC_ASSET_ID)
+                    onclick.reform(|_| SupportedAsset::LiquidBitcoin)
                 }
                 class="aspect-square gap-2 border border-gray-200 shadow-xl p-4 rounded-xl">
                 <img
@@ -196,7 +201,7 @@ fn asset_tiles(props: &AssetTilesProps) -> Html {
             </div>
             <div
                 onclick={
-                    onclick.reform(|_| *crate::T_USDT_ASSET_ID)
+                    onclick.reform(|_| SupportedAsset::Tether)
                 }
                 class="aspect-square gap-2 border border-gray-200 shadow-xl p-4 rounded-xl">
                 <img src="https://tether.to/images/logoCircle.png" class="size-14 my-2" />

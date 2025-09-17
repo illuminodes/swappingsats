@@ -5,7 +5,7 @@ pub struct WalletHistoryScreenProps {
     pub transaction: UseStateHandle<Option<lwk_wollet::WalletTx>>,
 }
 #[function_component(WalletHistoryScreen)]
-pub fn swap_coins_screen() -> HtmlResult {
+pub fn swap_coins_screen() -> Html {
     let transaction_detail = use_state(|| None::<lwk_wollet::WalletTx>);
     let back_option = if transaction_detail.is_some() {
         html! {
@@ -30,25 +30,22 @@ pub fn swap_coins_screen() -> HtmlResult {
            </yew_router::components::Link<crate::router::AppRoute>>
         }
     };
-    Ok(html!(
+    html!(
         <>
-            // Header
             <div class="p-4 flex items-center w-full justify-between">
                 {back_option}
                 <h1 class="font-semibold">{"History"}</h1>
                 <button class="w-9"/>
             </div>
             // <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
-            {if let Some(_utxo) = (*transaction_detail).clone() {
-                html! {
-                }
-            } else {
-                html! {
-                    <TxHistory transaction={transaction_detail.clone()} />
-                }
-            }}
+            {
+                (*transaction_detail).clone().map_or_else(
+                    || html! { <TxHistory transaction={transaction_detail} /> },
+                    |_utxo| html! {}
+                )
+            }
         </>
-    ))
+    )
 }
 
 #[function_component(TxHistory)]
@@ -61,15 +58,14 @@ pub fn tx_history(_props: &WalletHistoryScreenProps) -> HtmlResult {
                 <div class="max-h-108 overflow-y-auto px-6 snap-y snap-mandatory space-y-4">
                 { txs.iter().cloned().map(|utxo| {
                     let net_balances = utxo.balance.clone();
-                    let confirmed_msg = if let Some(height) = utxo.height {
-                        html! {
+                    let confirmed_msg = utxo.height.map_or_else(
+                        || html! {
+                            <span class="text-xs text-gray-500">{"Unconfirmed"}</span>
+                        },
+                        |height| html! {
                             <span class="text-xs text-gray-500">{"Confirmed at block "}{height}</span>
                         }
-                    } else {
-                        html! {
-                            <span class="text-xs text-gray-500">{"Unconfirmed"}</span>
-                        }
-                    };
+                    );
                     html! {
                         <div class="flex flex-col p-3 border border-gray-200 shadow-lg snap-start rounded-xl">
                             {net_balances.iter().map(|(asset_id, balance)| {

@@ -50,6 +50,12 @@ impl NostradesIdb {
         Ok(())
     }
 
+    /// Creates a new `NostradesIdb` instance
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistError::Idb` if the `IndexedDB` factory cannot be created,
+    /// the database cannot be opened, or the database upgrade fails.
     pub async fn new() -> Result<Self, PersistError> {
         let factory = idb::Factory::new()?;
 
@@ -68,6 +74,12 @@ impl NostradesIdb {
             db: std::rc::Rc::new(db),
         })
     }
+    /// Stores a wallet update to the database
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistError::Idb` if the database transaction fails or
+    /// `PersistError::WasmSerde` if serialization fails.
     pub async fn push_update(&self, update: lwk_wollet::Update) -> Result<(), PersistError> {
         let tx = self
             .db
@@ -80,6 +92,11 @@ impl NostradesIdb {
         tx.commit()?.await?;
         Ok(())
     }
+    /// Retrieves all stored wallet updates from the database
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistError::Idb` if the database transaction fails.
     pub async fn get_all_updates(&self) -> Result<Vec<lwk_wollet::Update>, PersistError> {
         let tx = self
             .db
@@ -97,6 +114,12 @@ impl NostradesIdb {
             .collect())
     }
 
+    /// Stores a locked UTXO to the database
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistError::Idb` if the database transaction fails or
+    /// `PersistError::WasmSerde` if serialization fails.
     pub async fn push_locked_utxo(&self, utxo: elements::OutPoint) -> Result<(), PersistError> {
         let tx = self
             .db
@@ -108,6 +131,11 @@ impl NostradesIdb {
         tx.commit()?.await?;
         Ok(())
     }
+    /// Retrieves all locked UTXOs from the database
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistError::Idb` if the database transaction fails.
     pub async fn get_all_locked_utxos(&self) -> Result<Vec<elements::OutPoint>, PersistError> {
         let tx = self
             .db
@@ -124,6 +152,12 @@ impl NostradesIdb {
             })
             .collect())
     }
+    /// Removes UTXOs from the locked store that are not in the current outpoints list
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistError::Idb` if the database transaction fails or
+    /// `PersistError::WasmSerde` if deserialization fails.
     pub async fn unlock_utxos(
         &self,
         current_outpoints: &[elements::OutPoint],
@@ -135,7 +169,8 @@ impl NostradesIdb {
         let mut cursor = store.open_cursor(None, None)?.await?;
         while let Some(c) = cursor {
             // Assuming value is stored as OutPoint { txid, vout }
-            let val: elements::OutPoint = serde_wasm_bindgen::from_value::<elements::OutPoint>(c.value()?)?;
+            let val: elements::OutPoint =
+                serde_wasm_bindgen::from_value::<elements::OutPoint>(c.value()?)?;
 
             if !current_outpoints.contains(&val) {
                 c.delete()?;
@@ -147,6 +182,12 @@ impl NostradesIdb {
         Ok(())
     }
 
+    /// Stores a swap to the database
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistError::Idb` if the database transaction fails or
+    /// `PersistError::WasmSerde` if serialization fails.
     pub async fn push_swap(&self, swap: super::PersistedSwap) -> Result<(), PersistError> {
         let tx = self
             .db
@@ -158,6 +199,11 @@ impl NostradesIdb {
         tx.commit()?.await?;
         Ok(())
     }
+    /// Retrieves all stored swaps from the database
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistError::Idb` if the database transaction fails.
     pub async fn get_all_swaps(&self) -> Result<Vec<super::PersistedSwap>, PersistError> {
         let tx = self
             .db

@@ -6,21 +6,23 @@ pub struct SwapCoinsScreenProps {
 }
 
 #[function_component(SwapTesting)]
-pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
+pub fn swap_testing(props: &SwapCoinsScreenProps) -> Html {
     let wallet_ctx = crate::use_wallet_ctx();
     let nostr_key = nostr_minions::use_nostr_key();
     let relay_ctx = nostr_minions::use_nostr_relay_pool();
     let db_ctx = crate::use_nostrades_db();
     let Some(utxo_to_swap) = props.utxo_to_swap.as_ref().cloned() else {
-        return Ok(html! {
+        return html! {
             <div class="p-4">
                 <p class="text-gray-500">{"No UTXO selected for swap."}</p>
             </div>
-        });
+        };
     };
 
-    let utxo = utxo_to_swap.clone();
     let onclick = {
+        // Extrae solo los campos que necesitas para el closure
+        let outpoint = utxo_to_swap.outpoint;
+        let asset = utxo_to_swap.unblinded.asset;
         Callback::from(move |form_event: SubmitEvent| {
             form_event.prevent_default();
             let form = form_event.target_unchecked_into::<web_sys::HtmlFormElement>();
@@ -38,9 +40,9 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
             let relay = relay_ctx.clone();
             let db = db_ctx.clone();
 
-            let swap_asset_id = if utxo.unblinded.asset == *crate::T_L_BTC_ASSET_ID {
+            let swap_asset_id = if asset == *crate::T_L_BTC_ASSET_ID {
                 *crate::T_USDT_ASSET_ID
-            } else if utxo.unblinded.asset == *crate::T_USDT_ASSET_ID {
+            } else if asset == *crate::T_USDT_ASSET_ID {
                 *crate::T_L_BTC_ASSET_ID
             } else {
                 return;
@@ -48,7 +50,7 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
 
             yew::platform::spawn_local(async move {
                 let proposal = wallet
-                    .create_swap_offer(utxo.outpoint, swap_amount, swap_asset_id, &db)
+                    .create_swap_offer(outpoint, swap_amount, swap_asset_id, &db)
                     .await
                     .unwrap();
                 let mut proposal_note = nostr_minions::nostro2::NostrNote {
@@ -56,9 +58,9 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
                     kind: 32121,
                     ..Default::default()
                 };
-                proposal_note.tags.add_parameter_tag(
-                    format!("{}:{}", utxo.outpoint.txid, utxo.outpoint.vout).as_str(),
-                );
+                proposal_note
+                    .tags
+                    .add_parameter_tag(format!("{}:{}", outpoint.txid, outpoint.vout).as_str());
                 nostr_key
                     .sign_note(&mut proposal_note)
                     .expect("Failed to sign note");
@@ -67,20 +69,19 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> HtmlResult {
         })
     };
 
-    Ok(html! {
+    html! {
         <form
             class="flex flex-col items-center gap-4 justify-evenly px-6"
             onsubmit={onclick}>
             <input disabled={true} type="number" min="0" step="1000" name="input_amount" placeholder="Input Amount" value={utxo_to_swap.unblinded.value.to_string()} />
             <input type="number" min="0" step="1" name="swap_amount" placeholder="Swap Amount" />
-
             <input type="submit" value="Submit" />
         </form>
-    })
+    }
 }
 
 #[function_component(SwapCoinsScreen)]
-pub fn swap_coins_screen() -> HtmlResult {
+pub fn swap_coins_screen() -> Html {
     let utxo_to_swap = use_state(|| None::<lwk_wollet::WalletTxOut>);
     let back_option = if utxo_to_swap.is_some() {
         html! {
@@ -105,7 +106,7 @@ pub fn swap_coins_screen() -> HtmlResult {
            </yew_router::components::Link<crate::router::AppRoute>>
         }
     };
-    Ok(html!(
+    html!(
         <>
             // Header
             <div class="p-4 flex items-center w-full justify-between">
@@ -114,45 +115,42 @@ pub fn swap_coins_screen() -> HtmlResult {
                 <button class="w-9"/>
             </div>
             // <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
-            {if let Some(utxo) = (*utxo_to_swap).clone() {
-                html! {
-                    // <UtxoToSwap utxo_to_swap={utxo_to_swap.clone()} />
-                    <yew::suspense::Suspense fallback={html! {
-                        <div class="w-full items-center justify-center flex p-4">
-                            // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
-                        </div>
-                    }}>
-                        <SwapTesting  utxo_to_swap={utxo_to_swap.clone()} />
-                    </yew::suspense::Suspense>
-                }
-            } else {
-                html! {
-                    <Suspense fallback={html! {
-                        <div class="w-full items-center justify-center flex p-4">
-                            // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
-                        </div>
-                    }}>
-                        <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
-                        <LockedUtxos utxo_to_swap={utxo_to_swap.clone()} />
-                    </Suspense>
-                }
-            }}
+            // {if let Some(utxo) = (*utxo_to_swap).clone() {
+            //     html! {
+            //         // <UtxoToSwap utxo_to_swap={utxo_to_swap.clone()} />
+            //         <yew::suspense::Suspense fallback={html! {
+            //             <div class="w-full items-center justify-center flex p-4">
+            //                 // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
+            //             </div>
+            //         }}>
+            //             <SwapTesting  utxo_to_swap={utxo_to_swap.clone()} />
+            //         </yew::suspense::Suspense>
+            //     }
+            // } else {
+            //     html! {
+            //         <Suspense fallback={html! {
+            //             <div class="w-full items-center justify-center flex p-4">
+            //                 // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
+            //             </div>
+            //         }}>
+            //             <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
+            //             <LockedUtxos utxo_to_swap={utxo_to_swap.clone()} />
+            //         </Suspense>
+            //     }
+            // }}
         </>
-    ))
+    )
 }
 
 #[function_component(UtxoToSwap)]
-pub fn utxo_to_swap(props: &SwapCoinsScreenProps) -> HtmlResult {
-    let wallet_ctx = use_context::<crate::NostradeWalletStore>().expect("No wallet context found");
+pub fn utxo_to_swap(props: &SwapCoinsScreenProps) -> Html {
     let waiting_for_swap = use_state(|| None::<String>);
-    let nostr_key = nostr_minions::use_nostr_key();
-    let relay_ctx = nostr_minions::use_nostr_relay_pool();
     let Some(utxo) = (*props.utxo_to_swap).clone() else {
-        return Ok(html! {
+        return html! {
             <div class="p-4">
                 <p class="text-gray-500">{"No UTXO selected for swap."}</p>
             </div>
-        });
+        };
     };
     let (asset_name, image_url, units) = match utxo.unblinded.asset.to_string().as_str() {
         "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => (
@@ -165,7 +163,7 @@ pub fn utxo_to_swap(props: &SwapCoinsScreenProps) -> HtmlResult {
         }
         _ => ("Unknown Asset", "", "Unknown"),
     };
-    let (swap_asset_name, swap_image_url, swap_units, swap_asset_id) = match utxo
+    let (swap_asset_name, swap_image_url, _swap_units, _swap_asset_id) = match utxo
         .unblinded
         .asset
         .to_string()
@@ -186,20 +184,15 @@ pub fn utxo_to_swap(props: &SwapCoinsScreenProps) -> HtmlResult {
         _ => ("Unknown Asset", "", "Unknown", ""),
     };
 
-    let onclick = {
-        let utxo_to_swap = props.utxo_to_swap.clone();
-        let wallet_ctx = wallet_ctx.clone();
-        let waiting_for_swap = waiting_for_swap.clone();
-        Callback::from(move |_| {})
-    };
+    let onclick = { Callback::from(move |_| {}) };
 
     if let Some(req_id) = waiting_for_swap.as_ref() {
-        return Ok(html! {
+        return html! {
             <SwapNotification req_id={req_id.clone()} />
-        });
+        };
     }
 
-    Ok(html! {
+    html! {
             <div class="flex flex-col items-center gap-4 justify-evenly h-108 px-6">
                 <div class="flex items-center gap-4 w-full justify-evenly border border-gray-200 shadow-lg p-4 rounded-xl">
                     <div class="flex flex-col items-center gap-2">
@@ -222,7 +215,7 @@ pub fn utxo_to_swap(props: &SwapCoinsScreenProps) -> HtmlResult {
                     {"Swap Now"}
                 </button>
             </div>
-    })
+    }
 }
 
 #[function_component(LockedUtxos)]
@@ -287,14 +280,14 @@ pub fn locked_utxos(props: &SwapCoinsScreenProps) -> HtmlResult {
     })
 }
 
-#[derive(Clone, Debug, PartialEq, Properties)]
+#[derive(Clone, Debug, PartialEq, Eq, Properties)]
 pub struct SwapNotificationProps {
     pub req_id: String,
 }
 
 #[function_component(SwapNotification)]
-pub fn swap_notification(props: &SwapNotificationProps) -> HtmlResult {
-    Ok(html! {
+pub fn swap_notification(props: &SwapNotificationProps) -> Html {
+    html! {
         <div class="p-4 border border-gray-200 rounded-lg shadow-sm max-w-xs">
             <h3 class="font-semibold mb-2">{"Swap Accepted"}</h3>
             <p class="text-gray-500 text-wrap max-w-xs break-all">{format!("Swap Tx ID: {}", props.req_id)}</p>
@@ -305,7 +298,7 @@ pub fn swap_notification(props: &SwapNotificationProps) -> HtmlResult {
                {"View Transaction"}
             </a>
         </div>
-    })
+    }
 }
 
 #[function_component(SwappableUtxos)]

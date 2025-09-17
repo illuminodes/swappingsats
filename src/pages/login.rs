@@ -102,7 +102,7 @@ pub fn new_key_form() -> Html {
         })
     };
     let nsec_submit = {
-        let create_cb = create_key_cb.clone();
+        let create_cb = create_key_cb;
         Callback::from(move |form: web_sys::HtmlFormElement| {
             let Some(input) = form
                 .get_with_name("hex-key")
@@ -198,7 +198,7 @@ pub fn new_key_form() -> Html {
         .unwrap_or_default();
     let hex_key = new_key.nsec().unwrap_or_default();
     let onclick = {
-        let cb_create_key = create_key_cb.clone();
+        let cb_create_key = create_key_cb;
         let new_key = new_key.clone();
         Callback::from(move |_| {
             cb_create_key.emit((*new_key).clone());

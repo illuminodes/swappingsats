@@ -14,7 +14,17 @@ mod pages;
 // mod quote_provider;
 mod contexts;
 mod router;
-pub use contexts::*;
+
+pub use contexts::{
+    ESPLORA_CLIENT, FEE_ADDRESS, LiquidWebWallet, LiquidWebWalletError, NostradeWalletAction,
+    NostradeWalletError, NostradeWalletState, NostradeWalletStore, NostradesDbProvider,
+    NostradesIdb, OrderBookAction, OrderBookProvider, OrderBookStore, OrderbookError, PersistError,
+    PersistedSwap, SpentResponse, SwapStatus, TxResponse, WalletProvider, use_hard_cancel_swap,
+    use_locked_utxos, use_nostrades_db, use_orderbook_ctx, use_send_coins, use_soft_cancel_swap,
+    use_wallet_address, use_wallet_balance, use_wallet_ctx, use_wallet_locked_utxos,
+    use_wallet_transactions, use_wallet_utxos,
+};
+
 pub use pages::*;
 
 fn main() {
@@ -151,3 +161,16 @@ pub static T_USDT_ASSET_ID: std::sync::LazyLock<elements::AssetId> =
             .parse::<elements::AssetId>()
             .expect("Failed to parse asset id")
     });
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_illuminodes_address() {
+        let address = crate::ILLUMINODES_ADDRESS.clone();
+        assert_eq!(
+            address.to_string(),
+            "tlq1qqv8caryh8kdy6v3mgn6cljngks9geedrcdsxa8eav5l2p8hmcz3kedv082nkdurnjta8rrt2wjlhgk86mlhk5r2tjt0hkp4ty"
+        );
+    }
+}

@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-#[derive(Properties, PartialEq, Clone)]
+#[derive(Properties, PartialEq, Clone, Eq)]
 pub struct IconProps {
     #[prop_or(24)]
     pub size: u32,
