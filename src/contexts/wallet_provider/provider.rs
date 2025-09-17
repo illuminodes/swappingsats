@@ -21,6 +21,8 @@ impl NostradeWalletState {
     pub const fn synced(&self) -> bool {
         self.synced > 0
     }
+    /// # Errors
+    /// Returns an error if wallet updates cannot be retrieved, applied, or if UTXO operations fail.
     pub async fn load(&self, persistor: &crate::NostradesIdb) -> Result<(), NostradeWalletError> {
         let updates = persistor.get_all_updates().await?;
         self.wallet.apply_updates(updates).await?;
@@ -36,6 +38,8 @@ impl NostradeWalletState {
         persistor.unlock_utxos(&utxos).await?;
         Ok(())
     }
+    /// # Errors
+    /// Returns an error if wallet scanning fails, update persistence fails, or UTXO operations fail.
     pub async fn update_wallet(
         &self,
         persistor: &crate::NostradesIdb,
@@ -58,6 +62,8 @@ impl NostradeWalletState {
         persistor.unlock_utxos(&utxos).await?;
         Ok(())
     }
+    /// # Errors
+    /// Returns an error if wallet UTXOs cannot be retrieved or locked UTXO data cannot be fetched.
     pub async fn available_utxos(
         &self,
         persistor: &crate::NostradesIdb,
@@ -70,6 +76,8 @@ impl NostradeWalletState {
             .collect::<Vec<_>>();
         Ok(available_utxos)
     }
+    /// # Errors
+    /// Returns an error if wallet UTXOs cannot be retrieved or locked UTXO data cannot be fetched.
     pub async fn locked_utxos(
         &self,
         persistor: &crate::NostradesIdb,
@@ -82,6 +90,8 @@ impl NostradeWalletState {
             .collect::<Vec<_>>();
         Ok(locked_utxos)
     }
+    /// # Errors
+    /// Returns an error if wallet address retrieval fails, liquidex proposal creation fails, or UTXO locking fails.
     pub async fn create_swap_offer(
         &self,
         utxo: elements::OutPoint,
@@ -98,6 +108,8 @@ impl NostradeWalletState {
         Ok(proposal)
     }
 
+    /// # Errors
+    /// Returns an error if available UTXOs cannot be retrieved, liquidex transaction fails, or swap persistence fails.
     pub async fn liquidex_take(
         &self,
         proposal: lwk_wollet::LiquidexProposal<lwk_wollet::Validated>,
@@ -116,6 +128,8 @@ impl NostradeWalletState {
             .await?;
         Ok(txid)
     }
+    /// # Errors
+    /// Returns an error if available UTXOs cannot be retrieved, insufficient funds, or transaction sending fails.
     pub async fn normal_coin_send(
         &self,
         address: elements::Address,
@@ -161,6 +175,8 @@ impl NostradeWalletState {
             .await?;
         Ok(tx_id)
     }
+    /// # Errors
+    /// Returns an error if available UTXOs cannot be retrieved, no suitable fee UTXO is found, or transaction sending fails.
     pub async fn hard_cancel_swap(
         &self,
         utxo: elements::OutPoint,
@@ -352,7 +368,7 @@ pub fn use_hard_cancel_swap() -> Callback<elements::OutPoint> {
     let nostr_key = nostr_minions::use_nostr_key();
     let db_ctx = crate::use_nostrades_db();
     Callback::from(move |utxo: elements::OutPoint| {
-        let Some(keypair) = nostr_key.as_ref().cloned() else {
+        let Some(keypair) = nostr_key.clone() else {
             return;
         };
         let db = db_ctx.clone();

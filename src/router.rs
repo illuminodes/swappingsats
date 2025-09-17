@@ -1,7 +1,7 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-#[derive(Clone, Routable, PartialEq)]
+#[derive(Clone, Routable, PartialEq, Eq)]
 pub enum AppRoute {
     #[at("/")]
     Home,
@@ -44,10 +44,10 @@ pub fn main_pages() -> Html {
 }
 
 #[function_component(BottomNavigation)]
-pub fn bottom_navigation() -> HtmlResult {
+pub fn bottom_navigation() -> Html {
     let current_route = use_route::<AppRoute>();
     let base_class = classes!("flex", "flex-col", "items-center", "py-3");
-    Ok(html! {
+    html! {
     // Bottom Navigation
     <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
           <div class="flex justify-around py-2">
@@ -89,5 +89,5 @@ pub fn bottom_navigation() -> HtmlResult {
               </yew_router::components::Link<crate::router::AppRoute>>
         </div>
     </div>
-    })
+    }
 }

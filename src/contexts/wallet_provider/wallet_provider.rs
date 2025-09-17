@@ -1,3 +1,4 @@
+use wasm_bindgen::JsValue;
 use yew::prelude::*;
 
 pub static ESPLORA_CLIENT: std::sync::LazyLock<
@@ -22,15 +23,24 @@ pub struct NostradeWallet {
     signer: lwk_signer::SwSigner,
     persistor: Option<crate::persister::IdbPersister>,
 }
+
 impl NostradeWallet {
     #[must_use]
     pub const fn persistor(&self) -> Option<&crate::persister::IdbPersister> {
         self.persistor.as_ref()
     }
+
     #[must_use]
     pub const fn synced(&self) -> bool {
         self.synced > 0
     }
+
+    /// Loads wallet updates from persistent storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError::NoPersister` if no persister is available,
+    /// or other `NostradeWalletError` variants if loading updates fails.
     pub async fn load(&self) -> Result<(), NostradeWalletError> {
         web_sys::console::log_1(&"Loading wallet...".into());
         let Some(persistor) = &self.persistor else {
@@ -45,6 +55,13 @@ impl NostradeWallet {
         }
         Ok(())
     }
+
+    /// Performs a full synchronization with the blockchain.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError::NoPersister` if no persister is available,
+    /// or other `NostradeWalletError` variants if syncing fails.
     pub async fn full_sync(&self) -> Result<(), NostradeWalletError> {
         let Some(persistor) = &self.persistor else {
             return Err(NostradeWalletError::NoPersister);
@@ -57,6 +74,34 @@ impl NostradeWallet {
         persistor.push_update(update.clone()).await?;
         Ok(wollet.apply_update_no_persist(update)?)
     }
+
+    /// Retrieves the wallet balance for all assets.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError` if retrieving the balance fails.
+    pub async fn balance(
+        &self,
+    ) -> Result<std::collections::BTreeMap<elements::AssetId, u64>, NostradeWalletError> {
+        Ok(self.wollet.read().await.balance()?)
+    }
+
+    /// Retrieves a wallet address for receiving funds.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError` if generating the address fails.
+    pub async fn address(&self) -> Result<elements::Address, NostradeWalletError> {
+        let wollet = self.wollet.read().await;
+        Ok(wollet.address(None).map(|addr| addr.address().clone())?)
+    }
+
+    /// Retrieves available (unlocked) UTXOs from the wallet.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError::NoPersister` if no persister is available,
+    /// or other `NostradeWalletError` variants if retrieving UTXOs fails.
     pub async fn available_utxos(
         &self,
     ) -> Result<Vec<lwk_wollet::WalletTxOut>, NostradeWalletError> {
@@ -74,6 +119,13 @@ impl NostradeWallet {
         web_sys::console::log_1(&format!("available_utxos: {}", available_utxos.len()).into());
         Ok(available_utxos)
     }
+
+    /// Retrieves locked UTXOs that are involved in proposals.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError::NoPersister` if no persister is available,
+    /// or other `NostradeWalletError` variants if retrieving UTXOs fails.
     pub async fn locked_utxos(&self) -> Result<Vec<lwk_wollet::WalletTxOut>, NostradeWalletError> {
         let Some(persistor) = &self.persistor else {
             return Err(NostradeWalletError::NoPersister);
@@ -89,11 +141,52 @@ impl NostradeWallet {
         Ok(locked_utxos)
     }
 
+    /// Retrieves all wallet transactions.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError` if retrieving transactions fails.
     pub async fn transactions(&self) -> Result<Vec<lwk_wollet::WalletTx>, NostradeWalletError> {
         let wollet = self.wollet.read().await;
         Ok(wollet.transactions()?)
     }
 
+    /// Sends coins to a recipient address.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError` if building, signing, or broadcasting the transaction fails.
+    pub async fn send_coins(
+        &self,
+        recipient: &elements::Address,
+        amount: u64,
+        asset_id: elements::AssetId,
+    ) -> Result<elements::Txid, NostradeWalletError> {
+        let available_utxos = self
+            .available_utxos()
+            .await?
+            .iter()
+            .map(|utxo| utxo.outpoint)
+            .collect::<Vec<_>>();
+        let wollet = self.wollet.write().await;
+        let mut pset = wollet
+            .tx_builder()
+            .set_wallet_utxos(available_utxos)
+            .add_recipient(recipient, amount, asset_id)?
+            .fee_rate(Some(100.)) // Adjust fee rate as needed
+            .finish()?;
+        lwk_common::Signer::sign(&self.signer, &mut pset)?;
+        let tx = wollet.finalize(&mut pset)?;
+        let tx_id = ESPLORA_CLIENT.write().await.broadcast(&tx).await?;
+        drop(wollet);
+        Ok(tx_id)
+    }
+
+    /// Creates a Liquidex swap proposal.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError` if building the proposal or signing fails.
     pub async fn liquidex_proposal(
         &self,
         utxo: elements::OutPoint,
@@ -113,6 +206,12 @@ impl NostradeWallet {
         Ok(lwk_wollet::LiquidexProposal::from_pset(&pset)?)
     }
 
+    /// Takes a Liquidex swap proposal.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError::NoPersister` if no persister is available,
+    /// or other `NostradeWalletError` variants if taking the proposal fails.
     pub async fn liquidex_take(
         &self,
         proposal: lwk_wollet::LiquidexProposal<lwk_wollet::Validated>,
@@ -123,24 +222,24 @@ impl NostradeWallet {
             .add_recipient(&crate::ILLUMINODES_ADDRESS, 1000, *crate::T_L_BTC_ASSET_ID)?
             .finish()?;
         lwk_common::Signer::sign(&self.signer, &mut fee_pset)?;
-        web_sys::console::log_1(&format!("Signed fee pset").into());
+        web_sys::console::log_1(&JsValue::from("Signed fee pset"));
         let mut pset = wollet
             .tx_builder()
             .liquidex_take(vec![proposal])?
             // .add_recipient(&crate::ILLUMINODES_ADDRESS, 1000, *crate::T_L_BTC_ASSET_ID)?
             .finish()?;
         lwk_common::Signer::sign(&self.signer, &mut pset)?;
-        web_sys::console::log_1(&format!("Signed proposal pset").into());
+        web_sys::console::log_1(&JsValue::from("Signed main pset"));
         for input in fee_pset.inputs() {
             pset.add_input(input.clone());
         }
         for output in fee_pset.outputs() {
             pset.add_output(output.clone());
         }
-        web_sys::console::log_1(&format!("Merged psets").into());
+        web_sys::console::log_1(&JsValue::from("Merged psets"));
 
         let tx = wollet.finalize(&mut fee_pset)?;
-        web_sys::console::log_1(&format!("Finalized tx").into());
+        web_sys::console::log_1(&JsValue::from("Finalized tx"));
         let _tx_id = ESPLORA_CLIENT.write().await.broadcast(&tx).await?;
         let Some(persistor) = &self.persistor else {
             return Err(NostradeWalletError::NoPersister);
@@ -155,6 +254,13 @@ impl NostradeWallet {
         }
         Ok(())
     }
+
+    /// Hard cancels a swap by burning the UTXO.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NostradeWalletError::NoPersister` if no persister is available,
+    /// or other `NostradeWalletError` variants if canceling the swap fails.
     pub async fn hard_cancel_swap(
         &self,
         utxo: lwk_wollet::WalletTxOut,

@@ -1,0 +1,31 @@
+cache:
+  key: "${CI_PROJECT_NAME}-${CI_COMMIT_REF_SLUG}"
+  policy: pull-push
+  paths:
+    - target/
+    - src/dist
+    - Cargo.lock
+
+stages:
+  - checks
+
+check_workspace:
+  stage: checks
+  tags:
+    - ansible
+  script:
+    - cargo clippy --release -- -D warnings
+
+lint_workspace:
+  stage: checks
+  tags:
+    - ansible
+  script:
+    - cargo check --release
+
+format_workspace:
+  stage: checks
+  tags:
+    - ansible
+  script:
+    - cargo fmt --all --check

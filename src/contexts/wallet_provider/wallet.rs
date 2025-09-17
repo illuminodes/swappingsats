@@ -1,16 +1,8 @@
-pub static FEE_ADDRESS: std::sync::LazyLock<elements::Address> = std::sync::LazyLock::new(
-    || {
-        "tlq1qqv8caryh8kdy6v3mgn6cljngks9geedrcdsxa8eav5l2p8hmcz3kedv082nkdurnjta8rrt2wjlhgk86mlhk5r2tjt0hkp4ty"
+pub static FEE_ADDRESS: std::sync::LazyLock<elements::Address> = std::sync::LazyLock::new(|| {
+    "tlq1qqv8caryh8kdy6v3mgn6cljngks9geedrcdsxa8eav5l2p8hmcz3kedv082nkdurnjta8rrt2wjlhgk86mlhk5r2tjt0hkp4ty"
             .parse::<elements::Address>()
             .expect("Failed to parse address")
-    },
-);
-
-pub const LIQUID_NETWORK_API: &str = "https://liquid.network/liquidtestnet/api/";
-pub const WATERFALLS_API: &str = "https://waterfalls.liquidwebwallet.org/liquidtestnet/api";
-
-pub static ESPLORA_REST_CLIENT: std::sync::LazyLock<reqwest::Client> =
-    std::sync::LazyLock::new(reqwest::Client::new);
+});
 
 pub static ESPLORA_CLIENT: std::sync::LazyLock<
     tokio::sync::RwLock<lwk_wollet::clients::asyncr::EsploraClient>,
@@ -53,6 +45,8 @@ pub struct LiquidWebWallet {
     signer: lwk_signer::SwSigner,
 }
 impl LiquidWebWallet {
+    /// # Errors
+    /// Returns an error if signer creation, descriptor parsing, or wallet initialization fails.
     pub fn new(
         mnemonic: &str,
         network: lwk_wollet::ElementsNetwork,
@@ -77,23 +71,33 @@ impl LiquidWebWallet {
             signer,
         })
     }
+    /// # Errors
+    /// Returns an error if the wallet balance cannot be retrieved.
     pub async fn balance(
         &self,
     ) -> Result<std::collections::BTreeMap<elements::AssetId, u64>, LiquidWebWalletError> {
         Ok(self.wollet.read().await.balance()?)
     }
+    /// # Errors
+    /// Returns an error if the wallet address cannot be generated.
     pub async fn address(&self) -> Result<elements::Address, LiquidWebWalletError> {
         let wollet = self.wollet.read().await;
         Ok(wollet.address(None).map(|addr| addr.address().clone())?)
     }
+    /// # Errors
+    /// Returns an error if the wallet UTXOs cannot be retrieved.
     pub async fn utxos(&self) -> Result<Vec<lwk_wollet::WalletTxOut>, LiquidWebWalletError> {
         let wollet = self.wollet.read().await;
         Ok(wollet.utxos()?)
     }
+    /// # Errors
+    /// Returns an error if the wallet transactions cannot be retrieved.
     pub async fn transactions(&self) -> Result<Vec<lwk_wollet::WalletTx>, LiquidWebWalletError> {
         let wollet = self.wollet.read().await;
         Ok(wollet.transactions()?)
     }
+    /// # Errors
+    /// Returns an error if transaction building, signing, finalization, or broadcasting fails.
     pub async fn send_coins(
         &self,
         utxos: Vec<elements::OutPoint>,
@@ -115,6 +119,8 @@ impl LiquidWebWallet {
         let tx_id = ESPLORA_CLIENT.write().await.broadcast(&tx).await?;
         Ok(tx_id)
     }
+    /// # Errors
+    /// Returns an error if proposal creation, signing, or PSET conversion fails.
     pub async fn liquidex_proposal(
         &self,
         utxo: elements::OutPoint,
@@ -135,6 +141,8 @@ impl LiquidWebWallet {
         Ok(lwk_wollet::LiquidexProposal::from_pset(&pset)?)
     }
 
+    /// # Errors
+    /// Returns an error if transaction building, signing, finalization, or broadcasting fails.
     pub async fn liquidex_take(
         &self,
         // TODO: Accept batch of proposals
@@ -164,6 +172,8 @@ impl LiquidWebWallet {
         Ok(ESPLORA_CLIENT.write().await.broadcast(&tx).await?)
     }
 
+    /// # Errors
+    /// Returns an error if wallet update application fails.
     pub async fn apply_updates(
         &self,
         updates: Vec<lwk_wollet::Update>,
@@ -177,6 +187,8 @@ impl LiquidWebWallet {
         Ok(())
     }
 
+    /// # Errors
+    /// Returns an error if the full scan operation or update application fails.
     pub async fn full_scan(&self) -> Result<Option<lwk_wollet::Update>, LiquidWebWalletError> {
         let mut wollet = self.wollet.write().await;
         let Some(update) = ESPLORA_CLIENT.write().await.full_scan(&wollet).await? else {

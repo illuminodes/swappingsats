@@ -16,6 +16,7 @@ pub struct OrderBook {
     user_offer: Vec<nostr_minions::nostro2::NostrNote>,
     offers: Vec<nostr_minions::nostro2::NostrNote>,
 }
+
 impl OrderBook {
     pub async fn parsed_offers(
         &self,
@@ -59,6 +60,7 @@ impl OrderBook {
             .collect::<Vec<_>>();
         Ok(validated)
     }
+
     pub async fn my_offers(
         &self,
     ) -> Result<
@@ -162,7 +164,6 @@ pub fn quotes_provider(props: &yew::html::ChildrenProps) -> Html {
         offers: Vec::new(),
     });
     let subscribed = use_mut_ref(|| None::<String>);
-    // let unvalidated_proposals = use_mut_ref(Vec::new);
 
     let relay_clone = relay_ctx.clone();
     let sub_clone = subscribed;
@@ -183,7 +184,6 @@ pub fn quotes_provider(props: &yew::html::ChildrenProps) -> Html {
     });
 
     let user_pk = nostr_key.public_key();
-    // let proposals_clone = unvalidated_proposals.clone();
     let dispatch = ctx.dispatcher();
     use_effect_with(relay_ctx.last_note.clone(), move |note| {
         let Some(note) = note else {
@@ -208,34 +208,7 @@ pub fn quotes_provider(props: &yew::html::ChildrenProps) -> Html {
             dispatch.dispatch(OrderBookAction::AddOffer(note.clone()));
         }
     });
-    // use_effect_with(relay_ctx.last_event.clone(), move |event| {
-    //     if let Some(nostr_minions::nostro2::NostrRelayEvent::EndOfSubscription(.., id)) = event {
-    //         if Some(id) == subscribed.borrow().as_ref() {
-    //             //  web_sys::console::log_1(&"End of subscription".into());
-    //             //  web_sys::console::log_1(
-    //             //      &format!(
-    //             //          "Unvalidated Proposals: {}",
-    //             //          unvalidated_proposals.borrow().len()
-    //             //      )
-    //             //      .into(),
-    //             //  );
-    //             //  let unvalidated_proposals = unvalidated_proposals.borrow().clone();
-    //             //  yew::platform::spawn_local(async move {
-    //             //      let tx_ids = unvalidated_proposals
-    //             //          .iter()
-    //             //          .map(|(id, _)| id)
-    //             //          .copied()
-    //             //          .collect::<Vec<_>>();
-    //             //      let txs = crate::ESPLORA_CLIENT
-    //             //          .write()
-    //             //          .await
-    //             //          .get_transactions(tx_ids.as_slice())
-    //             //          .await
-    //             //          .unwrap();
-    //             //  });
-    //         }
-    //     }
-    // });
+
     html! {
         <ContextProvider<OrderBookStore> context={ctx}>
             {props.children.clone()}

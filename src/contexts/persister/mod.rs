@@ -19,7 +19,8 @@ pub struct PersistedSwap {
     pub status: SwapStatus,
 }
 impl PersistedSwap {
-    pub fn new(id: String, status: SwapStatus) -> Self {
+    #[must_use]
+    pub const fn new(id: String, status: SwapStatus) -> Self {
         Self { id, status }
     }
 }

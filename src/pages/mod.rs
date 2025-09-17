@@ -9,7 +9,6 @@ mod swaps;
 
 pub use history::*;
 pub use home::*;
-pub use keys::*;
 pub use login::*;
 pub use orderbook::*;
 pub use receive_coins::*;

@@ -2994,7 +2994,9 @@ dependencies = [
 
 [[package]]
 name = "shady-minions"
-version = "0.1.0"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34e71bff16d43fd8a45cece459f83926a8d8174a5d659dc73cc0682a50877f60"
 dependencies = [
  "gloo 0.11.0",
  "web-sys",

@@ -1,9 +1,9 @@
 use yew::prelude::*;
 
 #[function_component(DashboardScreen)]
-pub fn dashboard_screen() -> HtmlResult {
+pub fn dashboard_screen() -> Html {
     // let quote = crate::quote_provider::use_quote();
-    Ok(html! {
+    html! {
         <>
             <div class="bg-white px-4 py-4">
                 <div class="flex items-center mb-6">
@@ -55,19 +55,18 @@ pub fn dashboard_screen() -> HtmlResult {
                     <crate::components::LoaderIcon size=8 class="animate-spin text-gray-500" />
                 </div>
             }}>
-                
+
                 <MyOrders />
             </Suspense>
             </div>
 
         </>
-    })
+    }
 }
 
 #[function_component(MainOptions)]
-fn main_options() -> HtmlResult {
-    let navigator = yew_router::hooks::use_navigator().expect("No navigator found");
-    Ok(html! {
+fn main_options() -> Html {
+    html! {
         <div class="flex shadow-xl border border-gray-200 rounded-2xl ">
             <yew_router::components::Link<crate::router::AppRoute>
                 to={crate::router::AppRoute::Receive}>
@@ -92,9 +91,10 @@ fn main_options() -> HtmlResult {
                 </button>
             </yew_router::components::Link<crate::router::AppRoute>>
         </div>
-    })
+    }
 }
 
+#[allow(clippy::cast_precision_loss)]
 #[function_component(AssetList)]
 fn asset_list() -> HtmlResult {
     let balance = crate::use_wallet_balance()?;
@@ -190,7 +190,7 @@ fn my_orders() -> HtmlResult {
     };
     Ok(html! {
         <div class="p-4 flex flex-col gap-4 min-h-screen">
-            {orders.iter().map(|(note, offer)| {
+            {orders.iter().map(|(_, offer)| {
                 let input ={ match offer.input().asset.to_string().as_str() {
                     "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => "L-BTC",
                     "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => "USDT",
