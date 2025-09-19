@@ -15,16 +15,17 @@ pub fn receive_coins_screen() -> Html {
                            asset_handle.set(None);
                        })
                    }
-                   class="p-2 border border-gray-200 shadow-lg mr-4 rounded-xl">
-                   <crate::components::ArrowLeft size=5 />
+                   class="shadow-lg rounded-xl hover:cursor-pointer flex items-center justify-center"
+                >
+                   <crate::components::ArrowLeft class="size-5" />
                </button>
             }
         } else {
             html! {
                <yew_router::components::Link<crate::router::AppRoute>
                    to={crate::router::AppRoute::Home}>
-                   <button class="p-2 border border-gray-200 shadow-lg mr-4 rounded-xl">
-                       <crate::components::ArrowLeft size=5 />
+                   <button class="shadow-lg rounded-xl flex items-center justify-center hover:cursor-pointer">
+                       <crate::components::ArrowLeft class="size-5" />
                    </button>
                </yew_router::components::Link<crate::router::AppRoute>>
             }
@@ -32,25 +33,24 @@ pub fn receive_coins_screen() -> Html {
     };
 
     html! {
-        <>
+        <div class="flex flex-col items-center h-full max-w-4xl mx-auto flex-1 px-5 md:px-10 py-5">
             // Header
-            <div class="p-4 flex items-center w-full justify-between">
+            <div class="flex items-center w-full gap-5">
                 { go_back_button }
-                <h1 class="font-semibold align-center">{"Receive"}</h1>
-                <button class="w-9"/>
+                <h2 class="text-2xl font-bold text-balance text-foreground">{"Receive"}</h2>
             </div>
 
-            <div class="px-4">
-            {match *asset_handle {
-                Some(SupportedAsset::Tether | SupportedAsset::LiquidBitcoin) => html!(
-                    <ReceiveLiquidCoins />
-                ),
-                None => html!(
-                    <AssetTiles asset_handle={asset_handle.clone()} />
-                ),
-            }}
+            <div class="w-full h-fit mt-10">
+                {match *asset_handle {
+                    Some(SupportedAsset::Tether | SupportedAsset::LiquidBitcoin) => html!(
+                        <ReceiveLiquidCoins />
+                    ),
+                    None => html!(
+                        <AssetTiles asset_handle={asset_handle.clone()} />
+                    ),
+                }}
             </div>
-        </>
+        </div>
     }
 }
 
@@ -60,7 +60,7 @@ fn receive_liquid_coins() -> Html {
     let Some(address) = crate::use_wallet_address() else {
         return html! {
             <div class="p-4">
-                <p class="text-red-500">{"Failed to load wallet address."}</p>
+                <p class="text-destructive">{"Failed to load wallet address."}</p>
             </div>
         };
     };
@@ -92,7 +92,7 @@ fn receive_liquid_coins() -> Html {
     };
 
     html! {
-          <div class="p-6">
+          <>
               <div class="text-center mb-8">
                   <h2>
                       {"This is your "}
@@ -105,7 +105,7 @@ fn receive_liquid_coins() -> Html {
               </div>
 
               // QR Code
-              <div class="bg-white p-6 rounded-lg mb-6 flex justify-center">
+              <div class="bg-white rounded-lg mb-6 flex justify-center">
                   <div class="size-fit bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center">
                     <BitcoinQrCode
                         id={"bitcoin-qr".to_string()}
@@ -123,12 +123,12 @@ fn receive_liquid_coins() -> Html {
 
               // Address
               <code {onclick}
-                  class="flex items-center justify-evenly gap-2 bg-gray-200 border border-gray-400 shadow-sm p-2 rounded-lg mb-6 max-w-xs">
+                  class="flex items-center justify-evenly gap-2 bg-gray-200 border border-gray-400 shadow-sm p-2 rounded-lg mb-6 max-w-md mx-auto overflow-clip">
                   { copied_address }
               </code>
 
               // Action buttons
-              <div class="flex gap-4">
+              <div class="flex flex-col md:flex-row max-w-md mx-auto gap-4">
                   <button class="flex-1 p-2 border border-gray-200 shadow-lg rounded-xl flex items-center justify-center">
                       <span class="mr-2">{"💰"}</span>
                       {"Set Amount"}
@@ -138,7 +138,7 @@ fn receive_liquid_coins() -> Html {
                       {"Share"}
                   </button>
               </div>
-          </div>
+          </>
     }
 }
 
@@ -163,13 +163,12 @@ fn asset_tiles(props: &AssetTilesProps) -> Html {
         })
     };
     html!(
-        <div class="grid grid-cols-2 gap-4">
-            // Example asset tiles
+        <div class="flex flex-col gap-4">
             <div
                 onclick={
                     onclick.reform(|_| SupportedAsset::LiquidBitcoin)
                 }
-                class="aspect-square gap-2 border border-gray-200 shadow-xl p-4 rounded-xl">
+                class="gap-2 bg-card border border-primary/40 hover:cursor-pointer shadow-xl p-4 rounded-xl h-fit bg-muted">
                 <img
                     src="https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png"
                     class="size-14 my-2" />
@@ -180,7 +179,7 @@ fn asset_tiles(props: &AssetTilesProps) -> Html {
                 onclick={
                     onclick.reform(|_| SupportedAsset::Tether)
                 }
-                class="aspect-square gap-2 border border-gray-200 shadow-xl p-4 rounded-xl">
+                class="gap-2 border border-primary/40 hover:cursor-pointer shadow-xl p-4 rounded-xl h-fit bg-muted">
                 <img src="https://tether.to/images/logoCircle.png" class="size-14 my-2" />
                 <h3 class="font-semibold">{"Tether"}</h3>
                 <p class="text-sm text-gray-400">{"USDt"}</p>

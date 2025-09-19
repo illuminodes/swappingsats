@@ -7,7 +7,7 @@ pub struct WalletHistoryScreenProps {
 #[function_component(WalletHistoryScreen)]
 pub fn swap_coins_screen() -> Html {
     let transaction_detail = use_state(|| None::<lwk_wollet::WalletTx>);
-    let back_option = if transaction_detail.is_some() {
+    let _back_option = if transaction_detail.is_some() {
         html! {
            <button
                 onclick={
@@ -32,11 +32,6 @@ pub fn swap_coins_screen() -> Html {
     };
     html!(
         <>
-            <div class="p-4 flex items-center w-full justify-between">
-                {back_option}
-                <h1 class="font-semibold">{"History"}</h1>
-                <button class="w-9"/>
-            </div>
             // <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
             {
                 (*transaction_detail).clone().map_or_else(
@@ -53,45 +48,73 @@ pub fn tx_history(_props: &WalletHistoryScreenProps) -> HtmlResult {
     let txs = crate::use_wallet_transactions()?;
     // let tx_handle = props.transaction.clone();
     Ok(html! {
-            <div>
-                <h2 class="font-semibold mb-4 px-6 mt-3">{"Transactions"}</h2>
-                <div class="max-h-108 overflow-y-auto px-6 snap-y snap-mandatory space-y-4">
+        <div class="flex-1 max-w-4xl mx-auto py-5 px-10">
+            <h2 class="text-2xl font-bold text-balance mb-5 text-foreground">{"Transactions History"}</h2>
+            <div class="overflow-y-auto snap-y snap-mandatory space-y-4">
                 { txs.iter().cloned().map(|utxo| {
+                    web_sys::console::log_1(&format!("UTXO: {:?}", utxo.type_).into());
                     let net_balances = utxo.balance.clone();
-                    let confirmed_msg = utxo.height.map_or_else(
-                        || html! {
-                            <span class="text-xs text-gray-500">{"Unconfirmed"}</span>
-                        },
-                        |height| html! {
-                            <span class="text-xs text-gray-500">{"Confirmed at block "}{height}</span>
-                        }
-                    );
+                    let confirmed_msg = utxo.height.map_or_else(|| html! {
+                        <span class="text-sm text-muted-foreground">{"Unconfirmed"}</span>
+                    }, |height| html! {
+                        <span class="text-sm text-muted-foreground">{"Confirmed at block "}{height}</span>
+                    });
+
                     html! {
-                        <div class="flex flex-col p-3 border border-gray-200 shadow-lg snap-start rounded-xl">
-                            {net_balances.iter().map(|(asset_id, balance)| {
-                                let asset_name = match asset_id.to_string().as_str() {
-                                    "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => "Liquid Bitcoin",
-                                    "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => "Tether USD",
-                                    _ => "Unknown Asset",
-                                };
-                                html! {
-                                    <div class="flex justify-between items-center">
-                                        <span class="font-semibold">{asset_name}</span>
-                                        <span
-                                            class={if balance.is_negative() {
-                                                "text-red-500"
-                                            } else {
-                                                "text-green-500"
-                                            }}
-                                            >{balance}</span>
-                                    </div>
-                                }
-                            }).collect::<Html>()}
-                            {confirmed_msg}
+                        <div class="flex flex-col p-3 border border-gray-200 shadow-lg snap-start rounded-xl bg-card">
+                            <div class="flex items-center gap-4">
+                                {match utxo.type_.as_str() {
+                                    "incoming" => html! {
+                                        <div class="p-2 bg-muted rounded-full hidden sm:block">
+                                            <crate::components::ArrowDown class="size-4 text-primary" />
+                                        </div>
+                                    },
+                                    "unknown" => html! {
+                                        <div class="p-2 bg-chart-3/10 rounded-full hidden sm:block">
+                                            <crate::components::ArrowRightLeft class="size-4 text-chart-3" />
+                                        </div>
+                                    },
+                                    _ => html!{
+                                        <div class="p-2 bg-destructive/10 rounded-full hidden sm:block">
+                                            <crate::components::ArrowUp class="size-4 text-destructive" />
+                                        </div>
+                                    }
+                                }}
+                                <div class="flex-1 space-y-2">
+                                    {net_balances.iter().map(|(asset_id, balance)| {
+                                        let asset_name = match asset_id.to_string().as_str() {
+                                            "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => "Liquid Bitcoin",
+                                            "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => "Tether USD",
+                                            _ => "Unknown Asset",
+                                        };
+                                        html! {
+                                            <div class="flex justify-between items-center">
+                                                <span class="font-semibold">{asset_name}</span>
+                                                <span
+                                                    class={if balance.is_negative() {
+                                                        "text-sm text-muted-foreground font-light"
+                                                    } else {
+                                                        "text-foreground text-lg font-semibold"
+                                                    }}
+                                                >{if utxo.type_ == "incoming" || balance.is_positive() {
+                                                    format!("+{balance}")
+                                                } else if balance.to_string().starts_with('-') {
+                                                        format!("{balance}")
+                                                } else {
+                                                    format!("-{balance}")
+                                                }}</span>
+                                            </div>
+                                        }
+                                    }).collect::<Html>()}
+                                </div>
+                            </div>
+                            <div class="sm:pl-12">
+                                {confirmed_msg}
+                            </div>
                         </div>
                     }
                 }).collect::<Html>()}
-                </div>
             </div>
+        </div>
     })
 }

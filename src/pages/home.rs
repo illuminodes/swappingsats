@@ -4,12 +4,8 @@ use yew::prelude::*;
 pub fn dashboard_screen() -> Html {
     // let quote = crate::quote_provider::use_quote();
     html! {
-        <>
-            <div class="bg-white px-4 py-4">
-                <div class="flex items-center mb-6">
-                    <div class="text-2xl font-bold text-blue-600">{"NOSTRADES WALLET"}</div>
-                </div>
-
+        <div class="py-5 flex flex-col gap-6 max-w-4xl mx-auto flex-1 px-10">
+            <div>
                 <div class="mb-6">
                     // <p class="text-sm text-gray-600 mb-1">{"Bitcoin Price"}</p>
                     // {if let Some(quote) = quote {
@@ -36,57 +32,83 @@ pub fn dashboard_screen() -> Html {
                 <MainOptions />
 
             </div>
-            <div class="px-4">
+            <div class="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 border rounded-lg">
 
                 <h2 class="font-semibold mb-2">{"Spending Accounts"}</h2>
 
-            <Suspense fallback={html! {
-                <div class="w-full items-center justify-center flex p-4">
-                    <crate::components::LoaderIcon size=8 class="animate-spin text-gray-500" />
-                </div>
-            }}>
-                <AssetList />
-            </Suspense>
+                <Suspense fallback={html! {
+                    <div class="w-full items-center justify-center flex p-4">
+                        <crate::components::LoaderIcon size=8 class="animate-spin text-gray-500" />
+                    </div>
+                }}>
+                    <AssetList />
+                </Suspense>
             </div>
-            <div class="px-4">
-            <h3 class="font-semibold">{"My Orders"}</h3>
-            <Suspense fallback={html! {
-                <div class="w-full items-center justify-center flex p-4">
-                    <crate::components::LoaderIcon size=8 class="animate-spin text-gray-500" />
-                </div>
-            }}>
-
-                <MyOrders />
-            </Suspense>
+            <div>
+                <h3 class="font-semibold">{"My Orders"}</h3>
+                <Suspense fallback={html! {
+                    <div class="w-full items-center justify-center flex p-4">
+                        <crate::components::LoaderIcon size=8 class="animate-spin text-gray-500" />
+                    </div>
+                }}>
+                    <MyOrders />
+                </Suspense>
             </div>
 
-        </>
+        </div>
     }
 }
 
 #[function_component(MainOptions)]
 fn main_options() -> Html {
+    let base_class = classes!(
+        "flex",
+        "flex-col",
+        "justify-center",
+        "items-center",
+        "gap-4",
+        "text-foreground",
+        "hover:cursor-pointer",
+        "py-7",
+        "w-full",
+        "text-foreground",
+        "border",
+        "border-muted-foreground",
+        "rounded-lg",
+        "text-xl",
+        "flex-1",
+        "hover:bg-primary",
+        "transition-colors",
+        "duration-300",
+        "ease-in-out",
+        "hover:text-white"
+    );
+
     html! {
-        <div class="flex shadow-xl border border-gray-200 rounded-2xl ">
+        <div class="flex items-center justify-between gap-4 w-full">
             <yew_router::components::Link<crate::router::AppRoute>
-                to={crate::router::AppRoute::Receive}>
-                <button class="flex justify-center items-center flex-1 gap-2 border-r border-gray-200 p-3 px-6" onclick={Callback::noop()}>
-                    <crate::components::ArrowDownLeft class="size-5" />
+                to={crate::router::AppRoute::Receive}
+                classes={classes!("flex-1", "w-full")}>
+                <button class={classes!(base_class.clone())} onclick={Callback::noop()}>
+                    <crate::components::ArrowDown class="size-5" />
                     <span class="text-xs">{"Receive"}</span>
                 </button>
             </yew_router::components::Link<crate::router::AppRoute>>
+
             <yew_router::components::Link<crate::router::AppRoute>
-                to={crate::router::AppRoute::Swap}>
-                <button
-                    class="flex justify-center items-center gap-2 p-3 flex-1">
-                    <crate::components::ArrowUpDown class="size-5" />
+                to={crate::router::AppRoute::Swap}
+                classes={classes!("flex-1", "w-full")}>
+                <button class={classes!(base_class.clone())}>
+                    <crate::components::ArrowRightLeft class="size-5" />
                     <span class="text-xs">{"Swap"}</span>
                 </button>
             </yew_router::components::Link<crate::router::AppRoute>>
+
             <yew_router::components::Link<crate::router::AppRoute>
-                to={crate::router::AppRoute::SendCoins}>
-                <button class="flex justify-center items-center flex-1 gap-2 border-l border-gray-200 py-3 px-6">
-                    <crate::components::ArrowUpRight class="size-5" />
+                to={crate::router::AppRoute::SendCoins}
+                classes={classes!("flex-1", "w-full")}>
+                <button class={classes!(base_class.clone())}>
+                    <crate::components::ArrowUp class="size-5" />
                     <span class="text-xs">{"Send"}</span>
                 </button>
             </yew_router::components::Link<crate::router::AppRoute>>
@@ -120,40 +142,40 @@ fn asset_list() -> HtmlResult {
             <>
             // Accounts
                 <div class="mb-2">
-                    <div class="p-4 shadow-xl rounded-2xl border border-gray-200">
+                    <div class="p-4">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
                                 <img
                                     src="https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png"
                                     alt="Bitcoin" class="size-12 mr-5" />
                                 <div>
-                                    <h3 class="font-semibold">{"Liquid Bitcoin"}</h3>
-                                    <h3 class="text-gray-400">{"L-BTC"}</h3>
+                                    <h3 class="font-semibold text-foreground">{"Liquid Bitcoin"}</h3>
+                                    <h3 class="text-muted-foreground">{"L-BTC"}</h3>
                                 </div>
                             </div>
                             <div class="text-right">
-                                <p class="font-semibold">{liquid_balance as f64 / 100_000_000.0}</p>
-                                // <p class="text-sm text-gray-400">{format!("USD {:.2}", liquid_balance as f64 / 100_000_000.0 * quote.1.price  )}</p>
+                                <p class="font-semibold text-foreground">{liquid_balance as f64 / 100_000_000.0}</p>
+                                // <p class="text-sm text-muted-foreground">{format!("USD {:.2}", liquid_balance as f64 / 100_000_000.0 * quote.1.price  )}</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="mb-4">
-                    <div class="p-4 shadow-xl rounded-2xl border border-gray-200">
+                    <div class="p-4">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
                                 <img
                                     src="https://tether.to/images/logoCircle.png"
                                     alt="Bitcoin" class="size-12 mr-5" />
                                 <div>
-                                    <h3 class="font-semibold">{"Tether USDt"}</h3>
-                                    <h3 class="text-gray-400">{"USD-t"}</h3>
+                                    <h3 class="font-semibold text-foreground">{"Tether USDt"}</h3>
+                                    <h3 class="text-muted-foreground">{"USD-t"}</h3>
                                 </div>
                             </div>
                             <div class="text-right">
-                                <p class="font-semibold">{format!("{:.2}", usdt_balance as f64)}</p>
-                                <p class="text-sm text-gray-400">{format!("USD {:.2}", usdt_balance as f64)}</p>
+                                <p class="font-semibold text-foreground">{format!("{:.2}", usdt_balance as f64)}</p>
+                                <p class="text-sm text-muted-foreground">{format!("USD {:.2}", usdt_balance as f64)}</p>
                             </div>
                         </div>
                     </div>
@@ -189,7 +211,7 @@ fn my_orders() -> HtmlResult {
         });
     };
     Ok(html! {
-        <div class="p-4 flex flex-col gap-4 min-h-screen">
+        <div class="p-4 flex flex-col gap-4">
             {orders.iter().map(|(_, offer)| {
                 let input ={ match offer.input().asset.to_string().as_str() {
                     "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => "L-BTC",

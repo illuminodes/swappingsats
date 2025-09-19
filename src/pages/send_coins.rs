@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use crate::components::ArrowLeft;
 use wasm_bindgen::JsCast;
 use yew::prelude::*;
 
@@ -23,16 +24,16 @@ pub fn send_coins_screen() -> Html {
                            asset_handle.set(None);
                        })
                    }
-                   class="p-2 border border-gray-200 shadow-lg mr-4 rounded-xl">
-                   // <lucide_yew::ArrowLeft class="size-5" />
+                   class="size-5 flex items-center justify-center hover:cursor-pointer">
+                    <ArrowLeft class="size-5" />
                </button>
             }
         } else {
             html! {
                <yew_router::components::Link<crate::router::AppRoute>
                    to={crate::router::AppRoute::Home}>
-                   <button class="p-2 border border-gray-200 shadow-lg mr-4 rounded-xl">
-                      //  <lucide_yew::ArrowLeft class="size-5" />
+                   <button class="size-5 flex items-center justify-center hover:cursor-pointer">
+                      <ArrowLeft class="size-5" />
                    </button>
                </yew_router::components::Link<crate::router::AppRoute>>
             }
@@ -40,24 +41,21 @@ pub fn send_coins_screen() -> Html {
     };
 
     html!(
-        <>
-            // Header
-            <div class="p-4 flex items-center w-full justify-between">
-                {go_back_button}
-                <h1 class="font-semibold align-center">{"Send"}</h1>
-                <button class="w-9"/>
+        <div class="flex flex-col items-center max-w-4xl mx-auto flex-1 px-5 md:px-10 py-5">
+            <div class="flex items-center w-full gap-5">
+                { go_back_button }
+                <h2 class="text-2xl font-bold text-balance text-foreground">{"Receive"}</h2>
             </div>
-            <div class="p-6">
-                {match *selected_asset {
-                    Some(_) => html!(
-                        <SendCoinForm asset_handle={selected_asset.clone()} />
-                    ),
-                    None => html!(
-                        <AssetTiles asset_handle={selected_asset.clone()} />
-                    ),
-                }}
-            </div>
-        </>
+
+            {match *selected_asset {
+                Some(_) => html!(
+                    <SendCoinForm asset_handle={selected_asset.clone()} />
+                ),
+                None => html!(
+                    <AssetTiles asset_handle={selected_asset.clone()} />
+                ),
+            }}
+        </div>
     )
 }
 
@@ -136,42 +134,45 @@ fn send_coin_form(props: &AssetTilesProps) -> Html {
 
     html!(
         <form {onsubmit}
-            class="space-y-4">
-            <img
-                src={asset_img}
-                class="w-16 h-16 mx-auto mb-4"
-                alt="Asset Icon" />
-            <h2 class="text-center font-semibold mb-2">{asset_name}</h2>
-            <div class="relative w-full min-h-12">
+            class="flex flex-col w-full mx-auto shadow-xl rounded-2xl items-center gap-4 justify-evenly px-6 py-16 bg-card mt-16 border border-foreground/30"
+        >
+            <div class="max-w-md mx-auto space-y-5">
+                <img
+                    src={asset_img}
+                    class="w-16 h-16 mx-auto mb-4"
+                    alt="Asset Icon" />
+                <h2 class="text-center font-semibold mb-2">{asset_name}</h2>
+                <div class="relative w-full min-h-12">
+                    <input
+                        type="text"
+                        name="recipient_address"
+                        placeholder="Recipient Address"
+                        onchange={
+                            let address = address.clone();
+                            Callback::from(move |e: Event| {
+                                let input = e.target_unchecked_into::<web_sys::HtmlInputElement>();
+                                address.set(Some(input.value().parse::<elements::Address>().is_ok()));
+                            })
+                        }
+                        class="py-2 px-5 border border-gray-300 rounded-lg w-full truncate"
+                        required=true />
+                    {match *address {
+                        Some(false | true) | None => html!(),
+                    }}
+                </div>
                 <input
-                    type="text"
-                    name="recipient_address"
-                    placeholder="Recipient Address"
-                    onchange={
-                        let address = address.clone();
-                        Callback::from(move |e: Event| {
-                            let input = e.target_unchecked_into::<web_sys::HtmlInputElement>();
-                            address.set(Some(input.value().parse::<elements::Address>().is_ok()));
-                        })
-                    }
-                    class="absolute inset-0 p-2 border border-gray-200 rounded-lg max-w-64 truncate"
-                    required=true />
-                {match *address {
-                    Some(false | true) | None => html!(),
-                }}
+                    type="number"
+                    name="asset_amount"
+                    placeholder="Enter Amount"
+                    class="w-full py-2 px-5 border border-gray-300 rounded-lg"
+                    required=true
+                />
+                <input
+                    type="submit"
+                    value="Send Coins"
+                    class="bg-primary text-white w-full mx-auto text-center py-3 rounded-lg text-xl hover:cursor-pointer"
+                />
             </div>
-            <input
-                type="number"
-                name="asset_amount"
-                placeholder="Enter Amount"
-                class="w-full p-2 border border-gray-200 rounded-lg"
-                required=true
-                />
-            <input
-                type="submit"
-                value="Send"
-                class="w-full p-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 mt-16"
-                />
         </form>
     )
 }
@@ -186,13 +187,14 @@ fn asset_tiles(props: &AssetTilesProps) -> Html {
         })
     };
     html!(
-        <div class="grid grid-cols-2 gap-4">
+        <div class="flex flex-col gap-5 w-full mt-16">
             // Example asset tiles
             <div
                 onclick={
                     onclick.reform(|_| SupportedAsset::LiquidBitcoin)
                 }
-                class="aspect-square gap-2 border border-gray-200 shadow-xl p-4 rounded-xl">
+                class="gap-2 bg-muted border border-primary/30 shadow-xl p-4 rounded-xl"
+            >
                 <img
                     src="https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png"
                     class="size-14 my-2" />
@@ -203,7 +205,7 @@ fn asset_tiles(props: &AssetTilesProps) -> Html {
                 onclick={
                     onclick.reform(|_| SupportedAsset::Tether)
                 }
-                class="aspect-square gap-2 border border-gray-200 shadow-xl p-4 rounded-xl">
+                class="gap-2 bg-muted border border-primary/30 shadow-xl p-4 rounded-xl">
                 <img src="https://tether.to/images/logoCircle.png" class="size-14 my-2" />
                 <h3 class="font-semibold">{"Tether"}</h3>
                 <p class="text-sm text-gray-400">{"USDt"}</p>

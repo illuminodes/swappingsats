@@ -117,9 +117,9 @@ fn wallet_load() -> Html {
         });
     });
     let icon = if *syncing {
-        html! { <components::LoaderIcon size=5 class="animate-spin" /> }
+        html! { <components::LoaderIcon class="animate-spin size-7" /> }
     } else {
-        html! { <components::CheckIcon size=5 /> }
+        html! { <components::CheckIcon class="size-7" /> }
     };
     html! {
         <div
@@ -142,7 +142,7 @@ fn wallet_load() -> Html {
                     sync_handle.set(false);
                 });
             })}
-            class="fixed top-0 right-0 m-4 p-2 border border-gray-200 rounded-lg shadow-lg">
+            class="fixed top-4 right-40 m-4 rounded-full shadow-lg">
             {icon}
         </div>
     }
