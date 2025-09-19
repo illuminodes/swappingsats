@@ -71,11 +71,24 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> Html {
 
     html! {
         <form
-            class="flex flex-col items-center gap-4 justify-evenly px-6"
-            onsubmit={onclick}>
-            <input disabled={true} type="number" min="0" step="1000" name="input_amount" placeholder="Input Amount" value={utxo_to_swap.unblinded.value.to_string()} />
-            <input type="number" min="0" step="1" name="swap_amount" placeholder="Swap Amount" />
-            <input type="submit" value="Submit" />
+            class="flex flex-col w-full mx-auto shadow-xl rounded-2xl items-center gap-4 justify-evenly px-6 py-16 bg-card mt-16 border border-foreground/30"
+            onsubmit={onclick}
+        >
+            <div class="max-w-md mx-auto space-y-5">
+                <div class="flex items-center justify-center gap-4">
+                    <p class="text-muted-foreground text-md text-center">{"Available: "}</p>
+                    <p class="text-muted-foreground text-md text-center">{utxo_to_swap.unblinded.value.to_string()}</p>
+                </div>
+                <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    name="swap_amount"
+                    placeholder="Swap Amount"
+                    class="w-full border border-gray-300 py-2 px-5 rounded-lg"
+                />
+                <input type="submit" value="Swap Coins" class="bg-primary text-white w-full mx-auto text-center py-3 rounded-lg text-xl hover:cursor-pointer" />
+            </div>
         </form>
     }
 }
@@ -92,7 +105,7 @@ pub fn swap_coins_screen() -> Html {
                         utxo_to_swap.set(None);
                     })
                 }
-               class="p-2 border border-gray-200 shadow-lg mr-4 rounded-xl">
+               class="shadow-lg rounded-xl hover:cursor-pointer flex items-center justify-center">
                <crate::components::ArrowLeft class="size-5" />
            </button>
         }
@@ -100,45 +113,40 @@ pub fn swap_coins_screen() -> Html {
         html! {
            <yew_router::components::Link<crate::router::AppRoute>
                to={crate::router::AppRoute::Home}>
-               <button class="p-2 border border-gray-200 shadow-lg mr-4 rounded-xl">
+               <button class="shadow-lg rounded-xl hover:cursor-pointer flex items-center justify-center">
                    <crate::components::ArrowLeft class="size-5" />
                </button>
            </yew_router::components::Link<crate::router::AppRoute>>
         }
     };
     html!(
-        <>
+        <div class="flex flex-col items-center h-full max-w-4xl mx-auto flex-1 px-5 md:px-10 py-5">
             // Header
-            <div class="p-4 flex items-center w-full justify-between">
-                {back_option}
-                <h1 class="font-semibold">{"Swap"}</h1>
-                <button class="w-9"/>
+            <div class="flex items-center w-full gap-5">
+                { back_option }
+                <h2 class="text-2xl font-bold text-balance text-foreground">{"Swappable UXTO's"}</h2>
             </div>
             // <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
-            // {if let Some(utxo) = (*utxo_to_swap).clone() {
-            //     html! {
-            //         // <UtxoToSwap utxo_to_swap={utxo_to_swap.clone()} />
-            //         <yew::suspense::Suspense fallback={html! {
-            //             <div class="w-full items-center justify-center flex p-4">
-            //                 // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
-            //             </div>
-            //         }}>
-            //             <SwapTesting  utxo_to_swap={utxo_to_swap.clone()} />
-            //         </yew::suspense::Suspense>
-            //     }
-            // } else {
-            //     html! {
-            //         <Suspense fallback={html! {
-            //             <div class="w-full items-center justify-center flex p-4">
-            //                 // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
-            //             </div>
-            //         }}>
-            //             <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
-            //             <LockedUtxos utxo_to_swap={utxo_to_swap.clone()} />
-            //         </Suspense>
-            //     }
-            // }}
-        </>
+            {(*utxo_to_swap).clone().map_or_else(|| html! {
+                <Suspense fallback={html! {
+                    <div class="w-full items-center justify-center flex p-4">
+                        // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
+                    </div>
+                }}>
+                    <SwappableUtxos utxo_to_swap={utxo_to_swap.clone()} />
+                    <LockedUtxos utxo_to_swap={utxo_to_swap.clone()} />
+                </Suspense>
+            }, |_utxo| html! {
+                // <UtxoToSwap utxo_to_swap={utxo_to_swap.clone()} />
+                <yew::suspense::Suspense fallback={html! {
+                    <div class="w-full items-center justify-center flex p-4">
+                        // <crate::components::Loader class="size-8 animate-spin text-gray-500" />
+                    </div>
+                }}>
+                    <SwapTesting  utxo_to_swap={utxo_to_swap.clone()} />
+                </yew::suspense::Suspense>
+            })}
+        </div>
     )
 }
 
@@ -225,56 +233,56 @@ pub fn locked_utxos(props: &SwapCoinsScreenProps) -> HtmlResult {
     let hard_cancel_swap = crate::use_hard_cancel_swap();
     let soft_cancel_swap = crate::use_soft_cancel_swap();
     Ok(html! {
-            <div>
+            <div class="w-full">
                 <h2 class="font-semibold mb-4 px-6 mt-3">{"Locked UTXOs"}</h2>
                 <div class="max-h-108 overflow-y-auto px-6 snap-y snap-mandatory">
-                { locked_utxos.iter().map(|utxo| {
-                    let (image_url, asset_name, units) = match utxo.unblinded.asset.to_string().as_str() {
-                        "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => (
-                            "https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png",
-                            "L-BTC",
-                            "sats",
-                        ),
-                        "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => (
-                            "https://tether.to/images/logoCircle.png",
-                            "USDT",
-                            "USD",
-                        ),
-                        _ => ("", "Unknown Asset", "Unknown"),
-                    };
-                    let onclick = {
-                        let utxo_to_swap = to_swap.clone();
-                        let utxo = utxo.clone();
-                        Callback::from(move |_| {
-                            utxo_to_swap.set(Some(utxo.clone()));
-                        })
-                    };
-                    let tx_id = utxo.outpoint;
-                    let soft_cancel_swap = soft_cancel_swap.clone().reform(move |_| tx_id);
-                    let hard_cancel_swap = hard_cancel_swap.clone().reform(move |_| tx_id);
+                    { locked_utxos.iter().map(|utxo| {
+                        let (image_url, asset_name, units) = match utxo.unblinded.asset.to_string().as_str() {
+                            "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => (
+                                "https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png",
+                                "L-BTC",
+                                "sats",
+                            ),
+                            "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => (
+                                "https://tether.to/images/logoCircle.png",
+                                "USDT",
+                                "USD",
+                            ),
+                            _ => ("", "Unknown Asset", "Unknown"),
+                        };
+                        let onclick = {
+                            let utxo_to_swap = to_swap.clone();
+                            let utxo = utxo.clone();
+                            Callback::from(move |_| {
+                                utxo_to_swap.set(Some(utxo.clone()));
+                            })
+                        };
+                        let tx_id = utxo.outpoint;
+                        let soft_cancel_swap = soft_cancel_swap.clone().reform(move |_| tx_id);
+                        let hard_cancel_swap = hard_cancel_swap.clone().reform(move |_| tx_id);
 
-                    html! {
-                        <div {onclick} class="p-4 mb-2 border border-gray-200 rounded-lg shadow-sm max-w-xs snap-start">
-                            <div class="flex items-center">
-                                <img src={image_url} alt={asset_name} class="size-12 mr-4" />
-                                <div>
-                                    <h3 class="font-semibold">{asset_name}</h3>
-                                    <p class="text-gray-400">{format!("{} {units}", utxo.unblinded.value)}</p>
-                                    <button
-                                        onclick={soft_cancel_swap}
-                                        class="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
-                                        {"Soft Cancel"}
-                                    </button>
-                                    <button
-                                        onclick={hard_cancel_swap}
-                                        class="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
-                                        {"Hard Cancel"}
-                                    </button>
+                        html! {
+                            <div {onclick} class="p-4 mb-2 border border-gray-200 rounded-lg shadow-sm max-w-xs snap-start">
+                                <div class="flex items-center">
+                                    <img src={image_url} alt={asset_name} class="size-12 mr-4" />
+                                    <div>
+                                        <h3 class="font-semibold">{asset_name}</h3>
+                                        <p class="text-gray-400">{format!("{} {units}", utxo.unblinded.value)}</p>
+                                        <button
+                                            onclick={soft_cancel_swap}
+                                            class="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                                            {"Soft Cancel"}
+                                        </button>
+                                        <button
+                                            onclick={hard_cancel_swap}
+                                            class="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
+                                            {"Hard Cancel"}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    }
-                }).collect::<Html>()}
+                        }
+                    }).collect::<Html>()}
                 </div>
             </div>
     })
@@ -306,43 +314,42 @@ pub fn swappable_utxos(props: &SwapCoinsScreenProps) -> HtmlResult {
     let utxos = crate::use_wallet_utxos()?;
     let to_swap = props.utxo_to_swap.setter();
     Ok(html! {
-            <div>
-                <h2 class="font-semibold mb-4 px-6 mt-3">{"Swappable UTXOs"}</h2>
-                <div class="max-h-108 overflow-y-auto px-6 snap-y snap-mandatory">
-                { utxos.iter().map(|utxo| {
-                    let (image_url, asset_name, units) = match utxo.unblinded.asset.to_string().as_str() {
-                        "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => (
-                            "https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png",
-                            "L-BTC",
-                            "sats"
-                        ),
-                        "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => (
-                            "https://tether.to/images/logoCircle.png",
-                            "USDT",
-                            "USD"
-                        ),
-                        _ => ("", "Unknown Asset", "Unknown"),
-                    };
-                    let onclick = {
-                        let utxo_to_swap = to_swap.clone();
-                        let utxo = utxo.clone();
-                        Callback::from(move |_| {
-                            utxo_to_swap.set(Some(utxo.clone()));
-                        })
-                    };
+            <div class="flex-1 w-full mt-16">
+                <div class="max-h-108 overflow-y-auto px-6 snap-y snap-mandatory w-full">
+                    { utxos.iter().map(|utxo| {
+                        let (image_url, asset_name, units) = match utxo.unblinded.asset.to_string().as_str() {
+                            "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => (
+                                "https://www.block-chain24.com/sites/default/files/crypto/liquid_network_l-btc_coin_icon.png",
+                                "L-BTC",
+                                "sats"
+                            ),
+                            "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => (
+                                "https://tether.to/images/logoCircle.png",
+                                "USDT",
+                                "USD"
+                            ),
+                            _ => ("", "Unknown Asset", "Unknown"),
+                        };
+                        let onclick = {
+                            let utxo_to_swap = to_swap.clone();
+                            let utxo = utxo.clone();
+                            Callback::from(move |_| {
+                                utxo_to_swap.set(Some(utxo.clone()));
+                            })
+                        };
 
-                    html! {
-                        <div {onclick} class="p-4 mb-2 border border-gray-200 rounded-lg shadow-sm max-w-xs snap-start">
-                            <div class="flex items-center">
-                                <img src={image_url} alt={asset_name} class="size-12 mr-4" />
-                                <div>
-                                    <h3 class="font-semibold">{asset_name}</h3>
-                                    <p class="text-gray-400">{format!("{} {units}", utxo.unblinded.value)}</p>
+                        html! {
+                            <div {onclick} class="p-4 mb-2 bg-muted border border-primary/30 rounded-lg shadow-sm snap-start w-full hover:cursor-pointer">
+                                <div class="flex items-center">
+                                    <img src={image_url} alt={asset_name} class="size-12 mr-4" />
+                                    <div>
+                                        <h3 class="font-semibold">{asset_name}</h3>
+                                        <p class="text-gray-400">{format!("{} {units}", utxo.unblinded.value)}</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    }
-                }).collect::<Html>()}
+                        }
+                    }).collect::<Html>()}
                 </div>
             </div>
     })
