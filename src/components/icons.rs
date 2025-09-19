@@ -17,10 +17,15 @@ pub fn loader_icon(props: &IconProps) -> Html {
 }
 
 #[function_component(CheckIcon)]
-pub fn spinner_icon(props: &IconProps) -> Html {
+pub fn check_icon(props: &IconProps) -> Html {
     let IconProps { size, class } = props.clone();
     html! {
-        <svg xmlns="http://www.w3.org/2000/svg" {class} width={size.to_string()} height={size.to_string()} viewBox={format!("0 0 {size} {size}")} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-icon lucide-loader"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg"
+        {class}
+        width={size.to_string()}
+        height={size.to_string()}
+        viewBox={format!("0 0 {size} {size}")}
+        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-icon lucide-check"><path d="M20 6 9 17l-5-5"/></svg>
     }
 }
 #[function_component(ArrowLeft)]
