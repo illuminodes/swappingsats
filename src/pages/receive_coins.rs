@@ -105,9 +105,9 @@ fn receive_liquid_coins() -> Html {
                         size={400}
                         image_url={Some("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSuEvQLIjpwyNdMRB6Tt1vJzaEjFHiX_Xixng&s".to_string())}
                         dots_shape={yew_bitcoin_qr::Shape::Circle}
-                        dots_color={"#FF9900".to_string()}
-                        corners_square_color={"#FF9900".to_string()}
-                        corners_dot_color={"#FF9900".to_string()}
+                        dots_color={"#006c36".to_string()}
+                        corners_square_color={"#006c36".to_string()}
+                        corners_dot_color={"#006c36".to_string()}
                     />
 
                   </div>

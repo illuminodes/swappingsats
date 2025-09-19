@@ -49,14 +49,14 @@ fn app() -> Html {
         <yew_router::BrowserRouter>
             <nostr_minions::NostrAppProvider {relays} fallback={html!{<SplashScreen />}}>
                 <LoginCheck>
-                <NostradesDbProvider>
-                    <WalletProvider>
-                    <OrderBookProvider>
-                        <router::MainPages />
-                        // <WalletLoad />
-                        <WalletSync />
-                    </OrderBookProvider>
-                    </WalletProvider>
+                    <NostradesDbProvider>
+                        <WalletProvider>
+                            <OrderBookProvider>
+                                <router::MainPages />
+                                // <WalletLoad />
+                                <WalletSync />
+                            </OrderBookProvider>
+                        </WalletProvider>
                     </NostradesDbProvider>
                 </LoginCheck>
             </nostr_minions::NostrAppProvider>
@@ -117,9 +117,9 @@ fn wallet_load() -> Html {
         });
     });
     let icon = if *syncing {
-        html! { <components::LoaderIcon class="animate-spin size-7" /> }
+        html! { <components::LoaderIcon class="animate-spin size-7 mx-auto h-full" /> }
     } else {
-        html! { <components::CheckIcon class="size-7" /> }
+        html! { <components::CheckIcon class="size-7 mx-auto h-full" /> }
     };
     html! {
         <div
@@ -142,7 +142,7 @@ fn wallet_load() -> Html {
                     sync_handle.set(false);
                 });
             })}
-            class="fixed top-4 right-40 m-4 rounded-full shadow-lg">
+            class="fixed top-4 right-40 rounded-md shadow-lg border border-gray-300 size-10 mx-auto hover:cursor-pointer">
             {icon}
         </div>
     }
