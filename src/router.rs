@@ -128,16 +128,6 @@ pub fn sidebar() -> Html {
         <div class="h-full py-3 px-5 border-r border-gray-300 hidden md:block w-64">
             <div class="w-full flex flex-col gap-3">
                 <yew_router::components::Link<crate::router::AppRoute>
-                    to={crate::router::AppRoute::History}>
-                    <button class={
-                        classes!(base_class.clone(), if current_route == Some(AppRoute::History) { "text-white bg-primary text-center" } else { "text-muted-foreground hover:bg-muted transition-colors ease-in-out duration-300" })
-                    }>
-                        <History class="size-5" />
-                        <span class="text-md">{"History"}</span>
-                    </button>
-                </yew_router::components::Link<crate::router::AppRoute>>
-
-                <yew_router::components::Link<crate::router::AppRoute>
                     to={crate::router::AppRoute::Home}>
                     <button class={
                         classes!(base_class.clone(), if current_route == Some(AppRoute::Home) { "text-white bg-primary text-center" } else { "text-muted-foreground hover:bg-muted transition-colors ease-in-out duration-300" })
@@ -148,22 +138,32 @@ pub fn sidebar() -> Html {
                 </yew_router::components::Link<crate::router::AppRoute>>
 
                 <yew_router::components::Link<crate::router::AppRoute>
-                    to={crate::router::AppRoute::Keys}>
-                    <button class={
-                        classes!(base_class.clone(), if current_route == Some(AppRoute::Keys) { "text-white bg-primary text-center" } else { "text-muted-foreground hover:bg-muted transition-colors ease-in-out duration-300" })
-                    }>
-                        <Keys class="size-5" />
-                        <span class="text-md">{"Keys"}</span>
-                    </button>
-                </yew_router::components::Link<crate::router::AppRoute>>
-
-                <yew_router::components::Link<crate::router::AppRoute>
                     to={crate::router::AppRoute::OrderBook}>
                     <button class={
                         classes!(base_class.clone(), if current_route == Some(AppRoute::OrderBook) { "text-white bg-primary text-center" } else { "text-muted-foreground hover:bg-muted transition-colors ease-in-out duration-300" })
                     }>
                         <OrderBook class="size-5" />
                         <span class="text-md">{"OrderBook"}</span>
+                    </button>
+                </yew_router::components::Link<crate::router::AppRoute>>
+
+                <yew_router::components::Link<crate::router::AppRoute>
+                    to={crate::router::AppRoute::History}>
+                    <button class={
+                        classes!(base_class.clone(), if current_route == Some(AppRoute::History) { "text-white bg-primary text-center" } else { "text-muted-foreground hover:bg-muted transition-colors ease-in-out duration-300" })
+                    }>
+                        <History class="size-5" />
+                        <span class="text-md">{"History"}</span>
+                    </button>
+                </yew_router::components::Link<crate::router::AppRoute>>
+
+                <yew_router::components::Link<crate::router::AppRoute>
+                    to={crate::router::AppRoute::Keys}>
+                    <button class={
+                        classes!(base_class.clone(), if current_route == Some(AppRoute::Keys) { "text-white bg-primary text-center" } else { "text-muted-foreground hover:bg-muted transition-colors ease-in-out duration-300" })
+                    }>
+                        <Keys class="size-5" />
+                        <span class="text-md">{"Keys"}</span>
                     </button>
                 </yew_router::components::Link<crate::router::AppRoute>>
             </div>

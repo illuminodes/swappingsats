@@ -6,7 +6,6 @@ pub fn receive_coins_screen() -> Html {
     let asset_handle = use_state(|| None::<SupportedAsset>);
 
     let go_back_button = {
-        let asset_handle = asset_handle.clone();
         if asset_handle.is_some() {
             html! {
                <button
@@ -41,14 +40,7 @@ pub fn receive_coins_screen() -> Html {
             </div>
 
             <div class="w-full h-fit mt-10">
-                {match *asset_handle {
-                    Some(SupportedAsset::Tether | SupportedAsset::LiquidBitcoin) => html!(
-                        <ReceiveLiquidCoins />
-                    ),
-                    None => html!(
-                        <AssetTiles asset_handle={asset_handle.clone()} />
-                    ),
-                }}
+                <ReceiveLiquidCoins />
             </div>
         </div>
     }
@@ -83,10 +75,10 @@ fn receive_liquid_coins() -> Html {
     } else {
         html! {
             <>
-            <p class="text-xs text-gray-600">
-                {format!("{}...{}", &address.to_string()[0..16], &address.to_string()[address.to_string().len() - 16..])}
-            </p>
-            <crate::components::Copy class="size-4 mr-1" />
+                <p class="text-xs text-gray-600">
+                    {format!("{}...{}", &address.to_string()[0..16], &address.to_string()[address.to_string().len() - 16..])}
+                </p>
+                <crate::components::Copy class="size-4 mr-1" />
             </>
         }
     };
