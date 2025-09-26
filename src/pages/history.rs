@@ -46,7 +46,7 @@ pub fn swap_coins_screen() -> Html {
 #[function_component(TxHistory)]
 pub fn tx_history(_props: &WalletHistoryScreenProps) -> HtmlResult {
     let txs = crate::use_wallet_transactions()?;
-    // let tx_handle = props.transaction.clone();
+
     Ok(html! {
         <div class="flex-1 max-w-4xl mx-auto py-5 px-10">
             <h2 class="text-2xl font-bold text-balance mb-5 text-foreground">{"Transactions History"}</h2>
@@ -60,58 +60,74 @@ pub fn tx_history(_props: &WalletHistoryScreenProps) -> HtmlResult {
                         <span class="text-sm text-muted-foreground">{"Confirmed at block "}{height}</span>
                     });
 
+                    let explorer_url = format!("https://liquid.network/liquidtestnet/tx/{}", utxo.txid);
+
                     html! {
-                        <div class="flex flex-col p-3 border border-gray-200 shadow-lg snap-start rounded-xl bg-card">
-                            <div class="flex items-center gap-4">
-                                {match utxo.type_.as_str() {
-                                    "incoming" => html! {
-                                        <div class="p-2 bg-muted rounded-full hidden sm:block">
-                                            <crate::components::ArrowDown class="size-4 text-primary" />
-                                        </div>
-                                    },
-                                    "unknown" => html! {
-                                        <div class="p-2 bg-chart-3/10 rounded-full hidden sm:block">
-                                            <crate::components::ArrowRightLeft class="size-4 text-chart-3" />
-                                        </div>
-                                    },
-                                    _ => html!{
-                                        <div class="p-2 bg-destructive/10 rounded-full hidden sm:block">
-                                            <crate::components::ArrowUp class="size-4 text-destructive" />
-                                        </div>
-                                    }
-                                }}
-                                <div class="flex-1 space-y-2">
-                                    {net_balances.iter().map(|(asset_id, balance)| {
-                                        let asset_name = match asset_id.to_string().as_str() {
-                                            "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => "Liquid Bitcoin",
-                                            "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => "Tether USD",
-                                            _ => "Unknown Asset",
-                                        };
-                                        html! {
-                                            <div class="flex justify-between items-center">
-                                                <span class="font-semibold">{asset_name}</span>
-                                                <span
-                                                    class={if balance.is_negative() {
-                                                        "text-sm text-muted-foreground font-light"
-                                                    } else {
-                                                        "text-foreground text-lg font-semibold"
-                                                    }}
-                                                >{if utxo.type_ == "incoming" || balance.is_positive() {
-                                                    format!("+{balance}")
-                                                } else if balance.to_string().starts_with('-') {
-                                                        format!("{balance}")
-                                                } else {
-                                                    format!("-{balance}")
-                                                }}</span>
+                        <a
+                            href={explorer_url.clone()}
+                            target="_blank"
+                            class="block transition-all duration-200 hover:shadow-lg"
+                        >
+                            <div class="flex flex-col p-3 border border-gray-200 shadow-lg snap-start rounded-xl bg-card hover:bg-muted/50 cursor-pointer">
+                                <div class="flex items-center gap-4">
+                                    {match utxo.type_.as_str() {
+                                        "incoming" => html! {
+                                            <div class="p-2 bg-muted rounded-full hidden sm:block">
+                                                <crate::components::ArrowDown class="size-4 text-primary" />
+                                            </div>
+                                        },
+                                        "unknown" => html! {
+                                            <div class="p-2 bg-chart-3/10 rounded-full hidden sm:block">
+                                                <crate::components::ArrowRightLeft class="size-4 text-chart-3" />
+                                            </div>
+                                        },
+                                        _ => html!{
+                                            <div class="p-2 bg-destructive/10 rounded-full hidden sm:block">
+                                                <crate::components::ArrowUp class="size-4 text-destructive" />
                                             </div>
                                         }
-                                    }).collect::<Html>()}
+                                    }}
+                                    <div class="flex-1 space-y-2">
+                                        {net_balances.iter().map(|(asset_id, balance)| {
+                                            let asset_name = match asset_id.to_string().as_str() {
+                                                "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => "Liquid Bitcoin",
+                                                "38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5" => "Tether USD",
+                                                _ => "Unknown Asset",
+                                            };
+                                            html! {
+                                                <div class="flex justify-between items-center">
+                                                    <span class="font-semibold">{asset_name}</span>
+                                                    <span
+                                                        class={if balance.is_negative() {
+                                                            "text-sm text-muted-foreground font-light"
+                                                        } else {
+                                                            "text-foreground text-lg font-semibold"
+                                                        }}
+                                                    >{if utxo.type_ == "incoming" || balance.is_positive() {
+                                                        format!("+{balance}")
+                                                    } else if balance.to_string().starts_with('-') {
+                                                            format!("{balance}")
+                                                    } else {
+                                                        format!("-{balance}")
+                                                    }}</span>
+                                                </div>
+                                            }
+                                        }).collect::<Html>()}
+                                    </div>
+
+                                    <div class="flex items-center text-muted-foreground hover:text-primary">
+                                        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke_linecap="round" stroke_linejoin="round" stroke_width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="sm:pl-12 flex justify-between items-center">
+                                    <div class="flex flex-col">
+                                        {confirmed_msg}
+                                    </div>
                                 </div>
                             </div>
-                            <div class="sm:pl-12">
-                                {confirmed_msg}
-                            </div>
-                        </div>
+                        </a>
                     }
                 }).collect::<Html>()}
             </div>
