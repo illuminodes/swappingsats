@@ -10,6 +10,7 @@
 pub mod components;
 
 use yew::prelude::*;
+use yew_toasts::ToastProvider;
 mod pages;
 // mod quote_provider;
 mod contexts;
@@ -46,21 +47,24 @@ fn app() -> Html {
         },
     ];
     html! {
-        <yew_router::BrowserRouter>
-            <nostr_minions::NostrAppProvider {relays} fallback={html!{<SplashScreen />}}>
-                <LoginCheck>
-                    <NostradesDbProvider>
-                        <WalletProvider>
-                            <OrderBookProvider>
-                                <router::MainPages />
-                                // <WalletLoad />
-                                <WalletSync />
-                            </OrderBookProvider>
-                        </WalletProvider>
-                    </NostradesDbProvider>
-                </LoginCheck>
-            </nostr_minions::NostrAppProvider>
-        </yew_router::BrowserRouter>
+        <>
+            <ToastProvider />
+            <yew_router::BrowserRouter>
+                <nostr_minions::NostrAppProvider {relays} fallback={html!{<SplashScreen />}}>
+                    <LoginCheck>
+                        <NostradesDbProvider>
+                            <WalletProvider>
+                                <OrderBookProvider>
+                                    <router::MainPages />
+                                    // <WalletLoad />
+                                    <WalletSync />
+                                </OrderBookProvider>
+                            </WalletProvider>
+                        </NostradesDbProvider>
+                    </LoginCheck>
+                </nostr_minions::NostrAppProvider>
+            </yew_router::BrowserRouter>
+        </>
     }
 }
 

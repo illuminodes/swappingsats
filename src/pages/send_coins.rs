@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::components::ArrowLeft;
+use crate::components::{ArrowLeft, show_error_toast, show_success_toast};
 use shady_minions::ui::Modal;
 use wasm_bindgen::JsValue;
 use yew::prelude::*;
@@ -98,13 +98,26 @@ fn send_coin_form() -> Html {
                             tx_id.set(txid.to_string());
                             show_modal.set(true);
 
-                            // Clear form fields
+                            show_success_toast("Transaction sent successfully!");
+
                             recipient_addr.set(String::new());
                             asset_amt.set(String::new());
                             addr_valid.set(None);
                         }
                         Err(e) => {
                             web_sys::console::error_1(&format!("Failed to send coins: {e}").into());
+
+                            let error_message = if e.to_string().contains("insufficient") {
+                                "Insufficient funds for this transaction"
+                            } else if e.to_string().contains("fee") {
+                                "Unable to calculate network fees"
+                            } else if e.to_string().contains("network") {
+                                "Network error - please try again"
+                            } else {
+                                "Failed to send transaction"
+                            };
+
+                            show_error_toast(error_message);
                         }
                     }
                 });
@@ -118,17 +131,18 @@ fn send_coin_form() -> Html {
         let recipient_address = recipient_address.clone();
         let asset_amount = asset_amount.clone();
         let send_coins_with_modal = send_coins_with_modal;
+
         Callback::from(move |e: SubmitEvent| {
             e.prevent_default();
 
             if address_valid.is_none() || address_valid.is_some_and(|valid| !valid) {
-                web_sys::console::error_1(&"Invalid recipient address".into());
+                show_error_toast("Please enter a valid recipient address");
                 return;
             }
 
             let recipient_address_value = (*recipient_address).clone();
             let Ok(elements_address) = elements::Address::from_str(&recipient_address_value) else {
-                web_sys::console::error_1(&"Invalid recipient address".into());
+                show_error_toast("Invalid recipient address format");
                 return;
             };
 
@@ -140,14 +154,24 @@ fn send_coin_form() -> Html {
                 SupportedAsset::Tether => asset_amount_parsed >= 1,
             };
 
-            if recipient_address_value.is_empty() || asset_amount_parsed == 0 || !min_amount_valid {
+            if recipient_address_value.is_empty() {
+                show_error_toast("Please enter a recipient address");
+                return;
+            }
+
+            if asset_amount_parsed == 0 {
+                show_error_toast("Please enter a valid amount");
+                return;
+            }
+
+            if !min_amount_valid {
                 let error_msg = match *selected_asset {
                     SupportedAsset::LiquidBitcoin => {
                         "Amount must be at least 1000 sats (0.00001 L-BTC)"
                     }
                     SupportedAsset::Tether => "Amount must be at least 1 USDT",
                 };
-                web_sys::console::error_1(&error_msg.into());
+                show_error_toast(error_msg);
                 return;
             }
 
