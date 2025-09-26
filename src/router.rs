@@ -30,23 +30,26 @@ pub fn main_pages() -> Html {
                 </div>
             </div>
 
-            <div class="md:flex md:h-full">
+            <div class="flex h-[calc(100vh-theme(spacing.20))] md:h-full">
                 <Sidebar />
-                <Switch<AppRoute> render={move |switch| {
-                    match switch {
-                        AppRoute::Home => html! { <crate::DashboardScreen /> },
-                        AppRoute::Receive => html! { <crate::ReceiveCoinsScreen /> },
-                        AppRoute::SendCoins => html! { <crate::SendCoinsScreen /> },
-                        AppRoute::Swap => html! {
-                            <>
-                                <crate::SwapCoinsScreen />
-                            </>
-                        },
-                        AppRoute::Keys => html! { <></> },
-                        AppRoute::History => html! { <crate::WalletHistoryScreen /> },
-                        AppRoute::OrderBook => html! { <crate::OrderBookScreen /> },
-                    }
-                }} />
+
+                <div class="flex-1 overflow-y-auto">
+                    <Switch<AppRoute> render={move |switch| {
+                        match switch {
+                            AppRoute::Home => html! { <crate::DashboardScreen /> },
+                            AppRoute::Receive => html! { <crate::ReceiveCoinsScreen /> },
+                            AppRoute::SendCoins => html! { <crate::SendCoinsScreen /> },
+                            AppRoute::Swap => html! {
+                                <>
+                                    <crate::SwapCoinsScreen />
+                                </>
+                            },
+                            AppRoute::Keys => html! { <></> },
+                            AppRoute::History => html! { <crate::WalletHistoryScreen /> },
+                            AppRoute::OrderBook => html! { <crate::OrderBookScreen /> },
+                        }
+                    }} />
+                </div>
             </div>
 
             <BottomNavigation />
@@ -66,7 +69,6 @@ pub fn bottom_navigation() -> Html {
         "hover:cursor-pointer"
     );
     html! {
-        // Bottom Navigation
         <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden">
             <div class="flex justify-around">
                 <yew_router::components::Link<crate::router::AppRoute>
@@ -125,7 +127,7 @@ pub fn sidebar() -> Html {
         "w-full"
     );
     html! {
-        <div class="h-full py-3 px-5 border-r border-gray-300 hidden md:block w-64">
+        <div class="h-full py-3 px-5 border-r border-gray-300 hidden md:block w-64 flex-shrink-0 overflow-y-auto">
             <div class="w-full flex flex-col gap-3">
                 <yew_router::components::Link<crate::router::AppRoute>
                     to={crate::router::AppRoute::Home}>
