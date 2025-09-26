@@ -1,3 +1,4 @@
+use crate::components::{show_error_toast, show_success_toast};
 use yew::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Properties)]
@@ -61,19 +62,19 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> Html {
             form_event.prevent_default();
 
             if requested_value == 0 {
-                web_sys::console::error_1(&"Must specify amount to request".into());
+                show_error_toast("Please enter the amount you want in return");
                 return;
             }
 
             let Some(nostr_key) = nostr_key.clone() else {
-                web_sys::console::error_1(&"No nostr key found".into());
+                show_error_toast("Nostr key not found - please check your connection");
                 return;
             };
 
             let wallet = wallet_ctx.clone();
             let relay = relay_ctx.clone();
             let db = db_ctx.clone();
-            let navigator = navigator.clone(); // Clonar para el async block
+            let navigator = navigator.clone();
 
             web_sys::console::log_1(&format!(
                 "Creating swap offer: Offering entire UTXO ({offering_amount} {offering_units}) for {requested_value} {requesting_units}",
@@ -96,18 +97,80 @@ pub fn swap_testing(props: &SwapCoinsScreenProps) -> Html {
 
                         if let Err(e) = nostr_key.sign_note(&mut proposal_note) {
                             web_sys::console::error_1(&format!("Failed to sign note: {e}").into());
+                            show_error_toast("Failed to sign swap offer - please try again");
                             return;
                         }
 
-                        let _ = relay.send(proposal_note);
-                        web_sys::console::log_1(&"Swap offer created successfully".into());
+                        yew::platform::spawn_local(async move {
+                            match wallet
+                                .create_swap_offer(outpoint, requested_value, swap_asset_id, &db)
+                                .await
+                            {
+                                Ok(proposal) => {
+                                    let mut proposal_note = nostr_minions::nostro2::NostrNote {
+                                        content: serde_json::to_string(&proposal).unwrap(),
+                                        kind: 32121,
+                                        ..Default::default()
+                                    };
+                                    proposal_note.tags.add_parameter_tag(
+                                        format!("{}:{}", outpoint.txid, outpoint.vout).as_str(),
+                                    );
 
-                        navigator.push(&crate::router::AppRoute::Home);
+                                    if let Err(e) = nostr_key.sign_note(&mut proposal_note) {
+                                        web_sys::console::error_1(
+                                            &format!("Failed to sign note: {e}").into(),
+                                        );
+                                        show_error_toast(
+                                            "Failed to sign swap offer - please try again",
+                                        );
+                                        return;
+                                    }
+
+                                    let _event = relay.send(proposal_note);
+                                    web_sys::console::log_1(
+                                        &"Swap offer created successfully".into(),
+                                    );
+
+                                    show_success_toast("Swap offer created successfully!");
+
+                                    navigator.push(&crate::router::AppRoute::Home);
+                                }
+                                Err(e) => {
+                                    web_sys::console::error_1(
+                                        &format!("Failed to create swap offer: {e}").into(),
+                                    );
+
+                                    let error_message = if e.to_string().contains("insufficient") {
+                                        "Insufficient funds to create swap offer"
+                                    } else if e.to_string().contains("locked") {
+                                        "UTXO is already locked in another swap"
+                                    } else if e.to_string().contains("network") {
+                                        "Network error - please try again"
+                                    } else {
+                                        "Failed to create swap offer"
+                                    };
+
+                                    show_error_toast(error_message);
+                                }
+                            }
+                        });
                     }
                     Err(e) => {
                         web_sys::console::error_1(
                             &format!("Failed to create swap offer: {e}").into(),
                         );
+
+                        let error_message = if e.to_string().contains("insufficient") {
+                            "Insufficient funds to create swap offer"
+                        } else if e.to_string().contains("locked") {
+                            "UTXO is already locked in another swap"
+                        } else if e.to_string().contains("network") {
+                            "Network error - please try again"
+                        } else {
+                            "Failed to create swap offer"
+                        };
+
+                        show_error_toast(error_message);
                     }
                 }
             });

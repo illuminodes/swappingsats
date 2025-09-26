@@ -3079,6 +3079,7 @@ dependencies = [
  "yew",
  "yew-bitcoin-qr",
  "yew-router",
+ "yew-toasts",
 ]
 
 [[package]]
@@ -4079,6 +4080,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.101",
+]
+
+[[package]]
+name = "yew-toasts"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6518d74dc7b52530c6477317c3c2762a2e3c7c60823dc22fd5a4372a740acfc1"
+dependencies = [
+ "web-sys",
+ "yew",
 ]
 
 [[package]]
