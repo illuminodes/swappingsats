@@ -211,7 +211,7 @@ fn my_orders() -> HtmlResult {
         });
     };
     Ok(html! {
-        <div class="p-4 flex flex-col gap-4">
+        <div class="flex flex-col gap-4 mt-5">
             {orders.iter().map(|(_, offer)| {
                 let input ={ match offer.input().asset.to_string().as_str() {
                     "144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49" => "L-BTC",
@@ -226,7 +226,7 @@ fn my_orders() -> HtmlResult {
                 };
                 let output_amount = offer.output().amount;
                 html! {
-                    <div class="flex flex-row justify-between items-center p-4 border border-gray-200 shadow-lg rounded-xl">
+                    <div class="flex flex-row justify-between items-center p-4 border border-gray-200 shadow-lg rounded-lg">
                         <div class="flex flex-col gap-2">
                             <h4 class="font-semibold">{format!("{input} {input_amount}")}</h4>
                             <p class="text-gray-500">{"Swap for"}</p>
