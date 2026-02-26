@@ -1,3 +1,61 @@
+//! # Order Book Provider
+//!
+//! This module implements the real-time order book for SwappingSats, bridging the Nostr
+//! protocol with the LiquiDEX atomic swap mechanism on the Liquid Network.
+//!
+//! ## How It Works
+//!
+//! ### Subscribing to Swap Offers
+//!
+//! On mount, [`OrderBookProvider`] opens a Nostr subscription for
+//! **kind `32121`** events published in the last hour.  Every
+//! [`nostr_minions::nostro2::NostrNote`] that arrives on the relay pool is
+//! inspected:
+//!
+//! * If `content == "canceled"` → the offer identified by the note's first
+//!   parameter tag (`"txid:vout"`) is removed from the local order book.
+//! * If the content fails to parse as a
+//!   [`lwk_wollet::LiquidexProposal<Unvalidated>`] → the note is silently
+//!   ignored (wrong kind, spam, etc.).
+//! * If `note.pubkey` matches the current user's public key → the offer is
+//!   stored under `user_offer` (my own open orders).
+//! * Otherwise → the offer is stored under `offers` (counterparty orders
+//!   available to take).
+//!
+//! ### Validation Before Display
+//!
+//! Raw notes are stored **unvalidated** (the content is just JSON text).
+//! Before showing offers in the UI — or allowing a user to take one — the
+//! app calls [`OrderBook::parsed_offers`] (or [`OrderBook::my_offers`]).
+//! These async methods:
+//!
+//! 1. Parse every stored note's `content` into a
+//!    [`lwk_wollet::LiquidexProposal<Unvalidated>`].
+//! 2. Ask LWK for the transaction ID the proposal depends on (`needed_tx()`).
+//! 3. Batch-fetch those transactions from the Esplora API
+//!    ([`crate::ESPLORA_CLIENT`]).
+//! 4. Call `proposal.validate(tx)` via LWK, converting each proposal to
+//!    [`lwk_wollet::LiquidexProposal<Validated>`].
+//!
+//! Only proposals that pass on-chain validation are returned to the caller.
+//! This ensures the UI never shows an offer whose input UTXO has already
+//! been spent.
+//!
+//! ### Nostr Event Format
+//!
+//! ```text
+//! {
+//!   "kind": 32121,
+//!   "content": "<JSON-serialized LiquidexProposal>",
+//!   "tags": [["param", "txid:vout"]],   // identifies the offered UTXO
+//!   "pubkey": "<maker's hex pubkey>",
+//!   ...
+//! }
+//! ```
+//!
+//! Cancellation events re-use the same kind and tag structure but set
+//! `content` to the literal string `"canceled"`.
+
 use yew::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -11,13 +69,37 @@ pub struct TxResponse {
     pub txid: elements::Txid,
 }
 
+/// In-memory order book holding raw (unvalidated) Nostr notes.
+///
+/// Notes are stored as received from the relay pool.  Call
+/// [`OrderBook::parsed_offers`] or [`OrderBook::my_offers`] to obtain
+/// on-chain-validated proposals ready for display or acceptance.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OrderBook {
+    /// Swap offers published by the current user (my open orders).
     user_offer: Vec<nostr_minions::nostro2::NostrNote>,
+    /// Swap offers published by other peers (available to take).
     offers: Vec<nostr_minions::nostro2::NostrNote>,
 }
 
 impl OrderBook {
+    /// Returns all counterparty offers that pass on-chain validation.
+    ///
+    /// # Validation pipeline
+    ///
+    /// 1. Parse each stored note's `content` as a
+    ///    [`lwk_wollet::LiquidexProposal<Unvalidated>`].  Notes whose content
+    ///    cannot be parsed (e.g. stale data, wrong format) are silently dropped.
+    /// 2. Call `proposal.needed_tx()` to obtain the Liquid transaction ID
+    ///    that the proposal's input UTXO belongs to.
+    /// 3. Batch-fetch all required transactions from the Esplora endpoint
+    ///    ([`crate::ESPLORA_CLIENT`]).
+    /// 4. For each proposal, find its transaction and call
+    ///    `proposal.validate(tx)`.  Proposals whose UTXO has been spent or
+    ///    whose amounts don't match the on-chain record are dropped.
+    ///
+    /// The returned pairs of `(note, validated_proposal)` are safe to display
+    /// and accept.
     pub async fn parsed_offers(
         &self,
     ) -> Result<
@@ -61,6 +143,12 @@ impl OrderBook {
         Ok(validated)
     }
 
+    /// Returns the current user's own offers that still pass on-chain validation.
+    ///
+    /// Uses the same validation pipeline as [`OrderBook::parsed_offers`] but
+    /// operates on `user_offer` instead of `offers`.  An offer that no longer
+    /// validates (e.g. the UTXO was spent via a hard-cancel) will be absent
+    /// from the result even if the Nostr event is still in memory.
     pub async fn my_offers(
         &self,
     ) -> Result<
@@ -107,9 +195,14 @@ impl OrderBook {
     }
 }
 
+/// Actions that can be dispatched to update the [`OrderBook`] reducer state.
 pub enum OrderBookAction {
+    /// A new offer from a peer was received from the relay pool.
     AddOffer(nostr_minions::nostro2::NostrNote),
+    /// A new offer from the current user was received (echoed back by the relay).
     AddUserOffer(nostr_minions::nostro2::NostrNote),
+    /// A cancellation event was received; removes the offer whose parameter tag
+    /// matches the given `"txid:vout"` string.
     RemoveOffer(String),
 }
 
@@ -153,6 +246,30 @@ pub struct SpentResponse {
     pub spent: bool,
 }
 
+/// Yew context provider that subscribes to the Nostr relay pool and populates
+/// the [`OrderBook`] with live swap offers.
+///
+/// # Relay subscription
+///
+/// On first render, a [`nostr_minions::nostro2::NostrSubscription`] is sent to
+/// the relay pool requesting all kind-`32121` events published within the last
+/// **3600 seconds** (one hour).  Relays immediately replay matching stored
+/// events and continue streaming new ones.
+///
+/// # Incoming event routing
+///
+/// Each time `relay_ctx.last_note` changes (a new event arrived), the
+/// component inspects the note:
+///
+/// | Condition | Action |
+/// |-----------|--------|
+/// | `content == "canceled"` | Dispatch `RemoveOffer(param_tag)` |
+/// | Content unparseable as `LiquidexProposal<Unvalidated>` | Ignore |
+/// | `note.pubkey == user_pk` | Dispatch `AddUserOffer(note)` |
+/// | Otherwise | Dispatch `AddOffer(note)` |
+///
+/// The [`OrderBook`] is available to descendant components via
+/// [`use_orderbook_ctx`].
 #[function_component(OrderBookProvider)]
 pub fn quotes_provider(props: &yew::html::ChildrenProps) -> Html {
     let relay_ctx = nostr_minions::use_nostr_relay_pool();

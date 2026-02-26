@@ -1,3 +1,42 @@
+//! # Liquid Web Wallet
+//!
+//! Low-level interface to a Liquid Network wallet backed by the
+//! [LWK (Liquid Wallet Kit)](https://github.com/Blockstream/lwk) library.
+//!
+//! ## Key responsibilities
+//!
+//! * **Wallet initialisation** – derives a WPKH descriptor with SLIP-77
+//!   confidential blinding from a BIP-39 mnemonic (itself derived from the
+//!   user's Nostr key inside the higher-level [`crate::WalletProvider`]).
+//! * **Blockchain sync** – [`LiquidWebWallet::full_scan`] queries the Esplora
+//!   API ([`ESPLORA_CLIENT`]) and applies the resulting
+//!   [`lwk_wollet::Update`] to the in-memory wallet state.
+//! * **Making a swap offer** – [`LiquidWebWallet::liquidex_proposal`] builds
+//!   and half-signs a PSET for the *maker* side of a LiquiDEX atomic swap.
+//! * **Taking a swap offer** – [`LiquidWebWallet::liquidex_take`] completes a
+//!   validated proposal into a fully-signed transaction and broadcasts it.
+//!
+//! ## LiquiDEX atomic swap primer
+//!
+//! LiquiDEX is a protocol for non-custodial atomic swaps on the Liquid Network
+//! using Partially Signed Element Transactions (PSETs):
+//!
+//! 1. **Maker** calls [`liquidex_proposal`][LiquidWebWallet::liquidex_proposal]:
+//!    * Builds a PSET with their UTXO as input and the desired output (asset +
+//!      amount) directed back to their own address.
+//!    * Signs only their own input (half-signed PSET).
+//!    * Serialises the result as a [`lwk_wollet::LiquidexProposal<Unvalidated>`].
+//!    * The JSON of this proposal becomes the `content` of a Nostr kind-`32121`
+//!      event that is broadcast to the relay pool.
+//!
+//! 2. **Taker** calls [`liquidex_take`][LiquidWebWallet::liquidex_take]:
+//!    * Receives a [`lwk_wollet::LiquidexProposal<Validated>`] (the proposal
+//!      has been verified against the blockchain by [`crate::OrderBook::parsed_offers`]).
+//!    * Adds their own UTXOs to the PSET to satisfy the maker's requested output.
+//!    * Signs their inputs.
+//!    * Finalises and broadcasts the complete transaction via [`ESPLORA_CLIENT`].
+//!    * Returns the resulting `Txid`.
+
 pub static FEE_ADDRESS: std::sync::LazyLock<elements::Address> = std::sync::LazyLock::new(|| {
     "tlq1qqv8caryh8kdy6v3mgn6cljngks9geedrcdsxa8eav5l2p8hmcz3kedv082nkdurnjta8rrt2wjlhgk86mlhk5r2tjt0hkp4ty"
             .parse::<elements::Address>()
@@ -119,6 +158,20 @@ impl LiquidWebWallet {
         let tx_id = ESPLORA_CLIENT.write().await.broadcast(&tx).await?;
         Ok(tx_id)
     }
+    /// Constructs the **maker side** of a LiquiDEX atomic swap.
+    ///
+    /// Builds a PSET where:
+    /// * **Input**: the caller's UTXO at `utxo` (the asset being offered).
+    /// * **Output**: `amount` of `asset_id` sent back to the caller's own
+    ///   `recipient` address (the asset being requested).
+    ///
+    /// The PSET is signed with the wallet's software signer and converted to a
+    /// [`lwk_wollet::LiquidexProposal<Unvalidated>`].  The taker side remains
+    /// unsigned; the proposal is only half-complete at this point.
+    ///
+    /// The returned proposal must be serialised to JSON and published to the
+    /// Nostr relay pool as a kind-`32121` event (see [`crate::pages::SwapTesting`]).
+    ///
     /// # Errors
     /// Returns an error if proposal creation, signing, or PSET conversion fails.
     pub async fn liquidex_proposal(
@@ -141,6 +194,20 @@ impl LiquidWebWallet {
         Ok(lwk_wollet::LiquidexProposal::from_pset(&pset)?)
     }
 
+    /// Completes the **taker side** of a LiquiDEX atomic swap and broadcasts it.
+    ///
+    /// Takes a proposal that has already been validated against the blockchain
+    /// (see [`crate::OrderBook::parsed_offers`]) and:
+    ///
+    /// 1. Builds a new PSET that includes the validated proposal plus the
+    ///    taker's own `utxos` (to fund the maker's requested output).
+    /// 2. Signs the taker's inputs.
+    /// 3. Finalises the PSET into a complete Liquid transaction.
+    /// 4. Broadcasts it to the network via [`ESPLORA_CLIENT`].
+    ///
+    /// On success the swap is atomic: both parties' assets are exchanged in a
+    /// single on-chain transaction with no trusted third party.
+    ///
     /// # Errors
     /// Returns an error if transaction building, signing, finalization, or broadcasting fails.
     pub async fn liquidex_take(

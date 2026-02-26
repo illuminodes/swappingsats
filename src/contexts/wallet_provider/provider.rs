@@ -1,3 +1,65 @@
+//! # Wallet Provider
+//!
+//! High-level Yew state layer sitting on top of [`crate::LiquidWebWallet`].
+//!
+//! ## Initialisation
+//!
+//! [`WalletProvider`] is mounted inside the Nostr app provider.  On first
+//! render it:
+//!
+//! 1. Extracts a BIP-39 mnemonic from the user's Nostr key (the same seed is
+//!    used for both identities, so no separate wallet backup is needed).
+//! 2. Constructs a [`crate::LiquidWebWallet`] from that mnemonic.
+//! 3. Loads all previously persisted [`lwk_wollet::Update`] objects from
+//!    IndexedDB and applies them so the wallet can resume from its last known
+//!    state without a full rescan.
+//! 4. Reconciles locked UTXOs: any UTXO that is in the locked set but no
+//!    longer appears in the wallet's UTXO list is automatically unlocked (e.g.
+//!    it was spent by an accepted swap while the app was closed).
+//!
+//! ## Swap offer lifecycle
+//!
+//! ```text
+//! User selects UTXO
+//!       │
+//!       ▼
+//! create_swap_offer()          ← NostradeWalletState method
+//!   │  liquidex_proposal()     ← LiquidWebWallet: build + half-sign PSET
+//!   │  push_locked_utxo()      ← IDB: prevent UTXO double-use
+//!   └→ LiquidexProposal<Unvalidated>
+//!       │
+//!       ▼  (caller, swaps.rs)
+//! Nostr Note { kind: 32121, content: JSON(proposal), tag: "txid:vout" }
+//! nostr_key.sign_note()
+//! relay.send(note)             ← broadcast to wss://no.str.cr + wss://relay.illuminodes.com
+//! ```
+//!
+//! ## Taking (accepting) an offer
+//!
+//! ```text
+//! User clicks "Buy/Sell" in the order book
+//!       │
+//!       ▼
+//! liquidex_take()              ← NostradeWalletState method
+//!   │  wallet.liquidex_take()  ← LiquidWebWallet: complete + broadcast PSET
+//!   │  push_swap(Accepted)     ← IDB: record so we don't try twice
+//!   └→ Txid
+//! ```
+//!
+//! ## Cancellation
+//!
+//! Two cancellation strategies are available:
+//!
+//! * **Soft cancel** ([`use_soft_cancel_swap`]): publishes a kind-`32121`
+//!   Nostr note with `content = "canceled"` and the same `"txid:vout"` tag,
+//!   then unlocks the UTXO in IDB.  Peers who receive this event will remove
+//!   the offer from their order books.  The UTXO remains unspent on-chain.
+//!
+//! * **Hard cancel** ([`use_hard_cancel_swap`]): spends the locked UTXO
+//!   to the platform fee address (sending 420 sats), making the proposal
+//!   permanently invalid on-chain regardless of whether the soft-cancel
+//!   event is seen.  Also publishes a soft-cancel event afterwards.
+
 use yew::prelude::*;
 #[derive(Debug, thiserror::Error)]
 pub enum NostradeWalletError {
@@ -90,6 +152,23 @@ impl NostradeWalletState {
             .collect::<Vec<_>>();
         Ok(locked_utxos)
     }
+    /// Creates a swap offer for the given UTXO and locks it in the local database.
+    ///
+    /// # Steps
+    ///
+    /// 1. Derives the wallet's current receive address (where the requested
+    ///    asset will land when a taker accepts the offer).
+    /// 2. Calls [`crate::LiquidWebWallet::liquidex_proposal`] to build and
+    ///    half-sign the PSET – producing a
+    ///    [`lwk_wollet::LiquidexProposal<Unvalidated>`].
+    /// 3. Writes the UTXO's `OutPoint` to the `locked_utxos` IndexedDB store
+    ///    so that the UTXO is excluded from any future spend while the offer
+    ///    is open.
+    ///
+    /// The caller (see `src/pages/swaps.rs`) is responsible for serialising
+    /// the proposal to JSON, creating the Nostr note, signing it, and
+    /// broadcasting it to the relay pool.
+    ///
     /// # Errors
     /// Returns an error if wallet address retrieval fails, liquidex proposal creation fails, or UTXO locking fails.
     pub async fn create_swap_offer(
@@ -108,6 +187,25 @@ impl NostradeWalletState {
         Ok(proposal)
     }
 
+    /// Accepts (takes) a validated swap offer and records the result.
+    ///
+    /// The `proposal` must already be
+    /// [`lwk_wollet::LiquidexProposal<Validated>`] – i.e. it has been
+    /// cross-checked against the Liquid blockchain by
+    /// [`crate::OrderBook::parsed_offers`].  The `id` is the Nostr event ID
+    /// of the offer note; it is stored in IDB to prevent double-acceptance.
+    ///
+    /// # Steps
+    ///
+    /// 1. Collects all available (unlocked) UTXOs to fund the taker side.
+    /// 2. Calls [`crate::LiquidWebWallet::liquidex_take`] which completes,
+    ///    signs, and broadcasts the swap transaction.
+    /// 3. Persists a [`crate::PersistedSwap`] with status
+    ///    [`crate::SwapStatus::Accepted`] to IDB.
+    ///
+    /// On failure the caller (`src/pages/orderbook.rs`) persists
+    /// [`crate::SwapStatus::Failed`] so the offer is filtered from the UI.
+    ///
     /// # Errors
     /// Returns an error if available UTXOs cannot be retrieved, liquidex transaction fails, or swap persistence fails.
     pub async fn liquidex_take(
@@ -175,6 +273,17 @@ impl NostradeWalletState {
             .await?;
         Ok(tx_id)
     }
+    /// Spends the locked UTXO on-chain to permanently invalidate the offer.
+    ///
+    /// Sends the `utxo` together with a small L-BTC UTXO (> 1 000 sats) to
+    /// the platform fee address with an output of 420 sats.  Once broadcast,
+    /// the maker's input UTXO no longer exists; any taker who attempts to
+    /// validate the proposal via Esplora will fail, and the offer is
+    /// effectively dead on-chain regardless of Nostr relay state.
+    ///
+    /// The Nostr soft-cancel event is published by the hook wrapper
+    /// [`use_hard_cancel_swap`] after this method returns successfully.
+    ///
     /// # Errors
     /// Returns an error if available UTXOs cannot be retrieved, no suitable fee UTXO is found, or transaction sending fails.
     pub async fn hard_cancel_swap(
@@ -361,6 +470,15 @@ pub fn use_wallet_locked_utxos()
     })
 }
 
+/// Yew hook that returns a callback performing a **hard cancel** on a locked UTXO.
+///
+/// When invoked with an [`elements::OutPoint`] the callback:
+///
+/// 1. Calls [`NostradeWalletState::hard_cancel_swap`] to spend the UTXO
+///    on-chain (making the proposal permanently invalid).
+/// 2. Unlocks the UTXO in IndexedDB.
+/// 3. Publishes a kind-`32121` Nostr note with `content = "canceled"` and a
+///    `"txid:vout"` parameter tag so peers remove the offer from their books.
 #[hook]
 pub fn use_hard_cancel_swap() -> Callback<elements::OutPoint> {
     let wallet_ctx = use_context::<NostradeWalletStore>().expect("No wallet context found");
@@ -398,6 +516,19 @@ pub fn use_hard_cancel_swap() -> Callback<elements::OutPoint> {
     })
 }
 
+/// Yew hook that returns a callback performing a **soft cancel** on a locked UTXO.
+///
+/// When invoked with an [`elements::OutPoint`] the callback:
+///
+/// 1. Publishes a kind-`32121` Nostr note with `content = "canceled"` and a
+///    `"txid:vout"` parameter tag.  Peers who receive this event dispatch
+///    [`crate::OrderBookAction::RemoveOffer`] and remove it from their UI.
+/// 2. Unlocks the UTXO in IndexedDB (done first; the Nostr event is only
+///    sent if the DB unlock succeeds).
+///
+/// The UTXO is **not** spent on-chain; a race-condition exists where a taker
+/// might already be broadcasting the swap.  Use [`use_hard_cancel_swap`] when
+/// certainty is required.
 #[hook]
 pub fn use_soft_cancel_swap() -> Callback<elements::OutPoint> {
     let relay_ctx = nostr_minions::use_nostr_relay_pool();

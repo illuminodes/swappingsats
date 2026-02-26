@@ -1,3 +1,46 @@
+//! # Swap Creation UI
+//!
+//! This module provides the screens used to create a new swap offer.
+//!
+//! ## Flow
+//!
+//! ```text
+//! SwapCoinsScreen
+//!   │
+//!   ├─ SwappableUtxos  ← lists available (unlocked) UTXOs; user picks one
+//!   ├─ LockedUtxos     ← lists UTXOs already committed to open offers
+//!   │       ├─ [Soft Cancel] → use_soft_cancel_swap()
+//!   │       └─ [Hard Cancel] → use_hard_cancel_swap()
+//!   │
+//!   └─ SwapTesting (after UTXO selected)
+//!         │  User enters the amount they want in return
+//!         │
+//!         ▼  on submit:
+//!         wallet.create_swap_offer(utxo, requested_value, swap_asset_id, &db)
+//!           → LiquidexProposal<Unvalidated>       (UTXO is now locked in IDB)
+//!         NostrNote { kind: 32121, content: JSON(proposal), tag: "txid:vout" }
+//!         nostr_key.sign_note(&mut note)
+//!         relay.send(note)                        (broadcast to Nostr relays)
+//! ```
+//!
+//! ## Asset pairs
+//!
+//! Only two assets are supported on Liquid Testnet:
+//!
+//! | Asset | ID |
+//! |-------|----|
+//! | L-BTC | `144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49` |
+//! | USDT  | `38fca2d939696061a8f76d4e6b5eecd54e3b4221c846f24a6b279e79952850a5` |
+//!
+//! The swap direction is always the *other* asset: offering L-BTC requests
+//! USDT, and vice-versa.
+//!
+//! ## Market rate
+//!
+//! A static BTC/USD price of **$65 000** is used to suggest a fair rate.
+//! Users are free to enter any amount; a price comparison shows how their
+//! rate compares to the market suggestion.
+
 use crate::components::{show_error_toast, show_success_toast};
 use yew::prelude::*;
 
