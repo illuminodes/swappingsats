@@ -197,143 +197,14 @@ pub fn bitcoin_qr(props: &BitcoinQrCodeProps) -> Html {
     // Insert the attributes right after <svg
 
     html! {
-        <div style={size_attr}>
-            <div style="width:100%; height:100%;">
-                <style>{"
-                    div > svg {
-                        width: 100%;
-                        height: 100%;
-                    }
-                "}</style>
+        <>
+            <style>
+                {".qr-wrapper svg { width: 100%; height: 100%; }"}
+            </style>
+            <div class="qr-wrapper" style={size_attr}>
                 { yew::Html::from_html_unchecked(AttrValue::from(svg)) }
             </div>
-        </div>
+        </>
     }
 }
 
-// #[derive(Properties, Clone, PartialEq)]
-// pub struct BitcoinQrCodeProps {
-//     pub id: String,
-//     /// Payment methods (at least one must be provided)
-//     #[prop_or_default]
-//     pub unified: Option<String>,
-//     #[prop_or_default]
-//     pub bitcoin: Option<String>,
-//     #[prop_or_default]
-//     pub lightning: Option<String>,
-//     #[prop_or_default]
-//     pub parameters: Option<String>,
-//
-//     /// Dimensions and type
-//     #[prop_or_default]
-//     pub width: Option<String>,
-//     #[prop_or_default]
-//     pub height: Option<String>,
-//     #[prop_or_default]
-//     pub type_: Option<QrType>,
-//     #[prop_or_default]
-//     pub margin: Option<u32>,
-//
-//     /// Polling and debug options
-//     #[prop_or_default]
-//     pub is_polling: Option<bool>,
-//     #[prop_or_default]
-//     pub poll_interval: Option<u32>,
-//     #[prop_or_default]
-//     pub debug: Option<bool>,
-//
-//     /// Image options
-//     #[prop_or_default]
-//     pub image: Option<String>,
-//     #[prop_or_default]
-//     pub image_embedded: Option<bool>,
-//     #[prop_or_default]
-//     pub image_hide_background_dots: Option<bool>,
-//     #[prop_or_default]
-//     pub image_size: Option<f64>,
-//     #[prop_or_default]
-//     pub image_cross_origin: Option<String>,
-//     #[prop_or_default]
-//     pub image_margin: Option<u32>,
-//
-//     /// QR code technical options
-//     #[prop_or_default]
-//     pub shape: Option<QrShape>,
-//     #[prop_or_default]
-//     pub qr_type_number: Option<u32>,
-//     #[prop_or_default]
-//     pub qr_mode: Option<QrMode>,
-//     #[prop_or_default]
-//     pub qr_error_correction_level: Option<QrErrorCorrectionLevel>,
-//
-//     /// Style options
-//     #[prop_or_default]
-//     pub dots_type: Option<QrDotsType>,
-//     #[prop_or_default]
-//     pub dots_color: Option<String>,
-//     #[prop_or_default]
-//     pub dots_rotation: Option<f64>,
-//     #[prop_or_default]
-//     pub corners_square_type: Option<QrCornersSquareType>,
-//     #[prop_or_default]
-//     pub corners_square_color: Option<String>,
-//     #[prop_or_default]
-//     pub corners_dot_type: Option<QrCornersDotType>,
-//     #[prop_or_default]
-//     pub corners_dot_color: Option<String>,
-//     #[prop_or_default]
-//     pub background_round: Option<u32>,
-//     #[prop_or_default]
-//     pub background_color: Option<String>,
-// }
-//
-// #[function_component(BitcoinQrCode)]
-// pub fn bitcoin_qr(props: &BitcoinQrCodeProps) -> Html {
-//     html! {
-//         <bitcoin-qr
-//             id={props.id.clone()}
-//
-//             // Payment methods
-//             unified={props.unified.clone()}
-//             bitcoin={props.bitcoin.clone()}
-//             lightning={props.lightning.clone()}
-//             parameters={props.parameters.clone()}
-//
-//             // Dimensions and type
-//             width={props.width.clone()}
-//             height={props.height.clone()}
-//             type={props.type_.as_ref().map(|t| t.as_ref().to_string())}
-//             margin={props.margin.map(|m| m.to_string())}
-//
-//             // Polling and debug options
-//             is-polling={props.is_polling.map(|p| p.to_string())}
-//             poll-interval={props.poll_interval.map(|p| p.to_string())}
-//             debug={props.debug.map(|d| d.to_string())}
-//
-//             // Image options
-//             image={props.image.clone()}
-//             image-embedded={props.image_embedded.map(|e| e.to_string())}
-//             image-hide-background-dots={props.image_hide_background_dots.map(|h| h.to_string())}
-//             image-size={props.image_size.map(|s| s.to_string())}
-//             image-cross-origin={props.image_cross_origin.clone()}
-//             image-margin={props.image_margin.map(|m| m.to_string())}
-//
-//             // QR code technical options
-//             shape={props.shape.as_ref().map(|s|  s.as_ref().to_string())}
-//             qr-type-number={props.qr_type_number.map(|n| n.to_string())}
-//             qr-mode={props.qr_mode.as_ref().map(|m|  m.as_ref().to_string())}
-//             qr-error-correction-level={props.qr_error_correction_level.as_ref().map(|l| l.as_ref().to_string())}
-//
-//             // Style options
-//             dots-type={props.dots_type.as_ref().map(|t|  t.as_ref().to_string())}
-//             dots-color={props.dots_color.clone()}
-//             dots-rotation={props.dots_rotation.map(|r| r.to_string())}
-//             corners-square-type={props.corners_square_type.as_ref().map(|t| t.as_ref().to_string())}
-//             corners-square-color={props.corners_square_color.clone()}
-//             corners-dot-type={props.corners_dot_type.as_ref().map(|t| t.as_ref().to_string())}
-//             corners-dot-color={props.corners_dot_color.clone()}
-//             background-round={props.background_round.map(|r| r.to_string())}
-//             background-color={props.background_color.clone()}
-//         />
-//     }
-// }

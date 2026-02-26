@@ -1,7 +1,9 @@
 [package]
 name = "yew-bitcoin-qr"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
+license = "MIT"
+description = "A simple QR code generator for the Yew framework"
 
 [dependencies]
 fast_qr = { version = "0.13.1", features = ["svg"] }
